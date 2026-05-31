@@ -76,7 +76,7 @@ func CodeWithUsage(ctx context.Context, ol *ollama.Client, design, researchConte
 			return CodeResult{}, fmt.Errorf("coder chat with tools: %w", err)
 		}
 	} else {
-		req.Format = pipeline.CoderOutputSchema
+		req.Format = pipeline.GetCoderOutputSchema()
 		resp, err = ol.Chat(ctx, req)
 		if err != nil {
 			return CodeResult{}, fmt.Errorf("coder chat: %w", err)

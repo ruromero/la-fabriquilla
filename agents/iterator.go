@@ -68,7 +68,7 @@ func IterateWithUsage(ctx context.Context, ol *ollama.Client, code, reviewFeedba
 			return IterateResult{}, fmt.Errorf("iterate with tools: %w", err)
 		}
 	} else {
-		req.Format = pipeline.CoderOutputSchema
+		req.Format = pipeline.GetCoderOutputSchema()
 		resp, err = ol.Chat(ctx, req)
 		if err != nil {
 			return IterateResult{}, fmt.Errorf("iterate chat: %w", err)

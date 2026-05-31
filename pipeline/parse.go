@@ -6,10 +6,8 @@ import (
 	"strings"
 )
 
-// CoderOutputSchema is the JSON Schema for structured coder output.
-// When passed as the Format field in an Ollama ChatRequest, the model
-// is constrained to output valid JSON matching this schema.
-var CoderOutputSchema = map[string]any{
+// coderOutputSchema is the JSON Schema for structured coder output.
+var coderOutputSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
 		"files": map[string]any{
@@ -36,14 +34,26 @@ type coderOutput struct {
 	} `json:"files"`
 }
 
+// GetCoderOutputSchema returns a copy of the JSON Schema for structured coder output.
+func GetCoderOutputSchema() map[string]any {
+	cp := make(map[string]any, len(coderOutputSchema))
+	for k, v := range coderOutputSchema {
+		cp[k] = v
+	}
+	return cp
+}
+
 // ParseStructuredCodeOutput parses JSON structured coder output into a FileState slice.
 func ParseStructuredCodeOutput(jsonOutput string) ([]FileState, error) {
 	var out coderOutput
 	if err := json.Unmarshal([]byte(jsonOutput), &out); err != nil {
 		return nil, err
 	}
-	var files []FileState
+	files := make([]FileState, 0, len(out.Files))
 	for _, f := range out.Files {
+		if f.Path == "" {
+			return nil, fmt.Errorf("structured output contains file with empty path")
+		}
 		files = append(files, FileState{Path: f.Path, Content: f.Content})
 	}
 	return files, nil
