@@ -187,6 +187,96 @@ func TestChatWithToolsMaxCallsReturnsAccumulatedTokens(t *testing.T) {
 	}
 }
 
+func TestChatRequestFormatMarshal(t *testing.T) {
+	t.Run("with format field", func(t *testing.T) {
+		req := ChatRequest{
+			Model:    "test-model",
+			Messages: []Message{{Role: "user", Content: "hi"}},
+			Format: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"files": map[string]any{"type": "array"},
+				},
+				"required": []string{"files"},
+			},
+		}
+		data, err := json.Marshal(req)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(data, &raw); err != nil {
+			t.Fatalf("unmarshal raw: %v", err)
+		}
+		if _, ok := raw["format"]; !ok {
+			t.Error("expected 'format' field in marshaled JSON")
+		}
+	})
+
+	t.Run("without format field omits it", func(t *testing.T) {
+		req := ChatRequest{
+			Model:    "test-model",
+			Messages: []Message{{Role: "user", Content: "hi"}},
+		}
+		data, err := json.Marshal(req)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(data, &raw); err != nil {
+			t.Fatalf("unmarshal raw: %v", err)
+		}
+		if _, ok := raw["format"]; ok {
+			t.Error("expected 'format' field to be omitted when nil")
+		}
+	})
+}
+
+func TestChatRequestFormatSentToServer(t *testing.T) {
+	var receivedFormat json.RawMessage
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var raw map[string]json.RawMessage
+		json.NewDecoder(r.Body).Decode(&raw)
+		receivedFormat = raw["format"]
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ChatResponse{
+			Message:         Message{Role: "assistant", Content: `{"files":[]}`},
+			PromptEvalCount: 10,
+			EvalCount:       5,
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+
+	schema := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"files": map[string]any{"type": "array"}},
+		"required":   []string{"files"},
+	}
+
+	_, err := c.Chat(context.Background(), ChatRequest{
+		Model:    "test-model",
+		Messages: []Message{{Role: "user", Content: "hi"}},
+		Format:   schema,
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	if receivedFormat == nil {
+		t.Fatal("server did not receive format field")
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(receivedFormat, &parsed); err != nil {
+		t.Fatalf("unmarshal format: %v", err)
+	}
+	if parsed["type"] != "object" {
+		t.Errorf("format type = %v, want 'object'", parsed["type"])
+	}
+}
+
 type mockToolHandler struct {
 	result string
 }

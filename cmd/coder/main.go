@@ -143,7 +143,11 @@ func main() {
 		})
 	}
 
-	parsed := pipeline.ParseCodeOutput(code)
+	parsed, err := pipeline.ParseStructuredCodeOutput(code)
+	if err != nil {
+		slog.Info("structured parse failed, falling back to regex", "error", err)
+		parsed = pipeline.ParseCodeOutput(code)
+	}
 
 	state.Code = code
 	state.Review = &pipeline.ReviewState{

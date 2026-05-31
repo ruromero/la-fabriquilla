@@ -5,13 +5,22 @@ import (
 	"fmt"
 
 	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/pipeline"
 )
 
 const coderModel = "qwen3:14b"
 
 const coderSystemPrompt = `You are a software developer. Given a technical design, implement the code changes.
 
-For each file, output:
+When you have finished all tool calls and are ready to output the final code,
+respond with a JSON object in this exact format:
+{
+  "files": [
+    {"path": "relative/path/to/file.go", "language": "go", "content": "full file content here"}
+  ]
+}
+
+If JSON output is not possible, fall back to this format for each file:
 
 FILE: path/to/file
 ` + "```" + `language
@@ -67,6 +76,7 @@ func CodeWithUsage(ctx context.Context, ol *ollama.Client, design, researchConte
 			return CodeResult{}, fmt.Errorf("coder chat with tools: %w", err)
 		}
 	} else {
+		req.Format = pipeline.GetCoderOutputSchema()
 		resp, err = ol.Chat(ctx, req)
 		if err != nil {
 			return CodeResult{}, fmt.Errorf("coder chat: %w", err)

@@ -21,6 +21,7 @@ type ChatRequest struct {
 	Tools    []Tool    `json:"tools,omitempty"`
 	Stream   bool      `json:"stream"`
 	Options  *Options  `json:"options,omitempty"`
+	Format   any       `json:"format,omitempty"` // JSON Schema for structured output
 }
 
 type Message struct {

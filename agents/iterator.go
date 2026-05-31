@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/pipeline"
 )
 
 const iteratorSystemPrompt = `You are a software developer applying review feedback to code.
@@ -14,7 +15,15 @@ Given the current code and a structured review with severity levels, apply fixes
 2. Then address [MEDIUM] issues
 3. [LOW] issues are optional
 
-For each file changed, output the complete updated file:
+When you have finished all tool calls and are ready to output the final code,
+respond with a JSON object in this exact format:
+{
+  "files": [
+    {"path": "relative/path/to/file.go", "language": "go", "content": "full file content here"}
+  ]
+}
+
+If JSON output is not possible, fall back to this format for each file:
 
 FILE: path/to/file
 ` + "```" + `language
@@ -59,6 +68,7 @@ func IterateWithUsage(ctx context.Context, ol *ollama.Client, code, reviewFeedba
 			return IterateResult{}, fmt.Errorf("iterate with tools: %w", err)
 		}
 	} else {
+		req.Format = pipeline.GetCoderOutputSchema()
 		resp, err = ol.Chat(ctx, req)
 		if err != nil {
 			return IterateResult{}, fmt.Errorf("iterate chat: %w", err)
