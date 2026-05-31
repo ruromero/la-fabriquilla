@@ -162,6 +162,26 @@ func TestValidateURL(t *testing.T) {
 			addrs:        map[string][]string{"tailscale.test": {"100.100.1.1"}},
 		},
 
+		// Unspecified and ULA
+		{
+			name:    "unspecified 0.0.0.0",
+			url:     "http://zero.test",
+			addrs:   map[string][]string{"zero.test": {"0.0.0.0"}},
+			wantErr: true,
+		},
+		{
+			name:    "unspecified ::",
+			url:     "http://zero6.test",
+			addrs:   map[string][]string{"zero6.test": {"::"}},
+			wantErr: true,
+		},
+		{
+			name:    "IPv6 ULA fc00::/7",
+			url:     "http://ula.test",
+			addrs:   map[string][]string{"ula.test": {"fd12::1"}},
+			wantErr: true,
+		},
+
 		// Mixed addresses — one bad is enough
 		{
 			name:    "mixed public and private IPs",
@@ -174,7 +194,7 @@ func TestValidateURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resolver = &mockResolver{addrs: tt.addrs, err: tt.resolveErr}
-			err := ValidateURL(tt.url, tt.allowPrivate)
+			err := ValidateURL(context.Background(), tt.url, tt.allowPrivate)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateURL(%q, %v) error = %v, wantErr %v", tt.url, tt.allowPrivate, err, tt.wantErr)
 			}
@@ -187,7 +207,7 @@ func TestValidateRedirectURL(t *testing.T) {
 	defer func() { resolver = origResolver }()
 
 	resolver = &mockResolver{addrs: map[string][]string{"evil.test": {"10.0.0.1"}}}
-	if err := ValidateRedirectURL("http://evil.test", false); err == nil {
+	if err := ValidateRedirectURL(context.Background(), "http://evil.test", false); err == nil {
 		t.Error("ValidateRedirectURL should block private IPs on redirect")
 	}
 }

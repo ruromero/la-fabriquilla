@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/url"
 	"strings"
-	"time"
 )
 
 // Resolver abstracts DNS resolution for testing.
@@ -20,16 +19,22 @@ var blockedCIDRs []*net.IPNet
 
 func init() {
 	for _, cidr := range []string{
+		"0.0.0.0/8",
 		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
+		"100.64.0.0/10",
 		"127.0.0.0/8",
 		"169.254.0.0/16",
-		"100.64.0.0/10",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"::/128",
 		"::1/128",
+		"fc00::/7",
 		"fe80::/10",
 	} {
-		_, n, _ := net.ParseCIDR(cidr)
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic("sandbox/url: bad CIDR " + cidr + ": " + err.Error())
+		}
 		blockedCIDRs = append(blockedCIDRs, n)
 	}
 }
@@ -43,7 +48,7 @@ var metadataIP = net.ParseIP("169.254.169.254")
 
 // ValidateURL checks that rawURL is safe to fetch. It resolves DNS before
 // checking IPs to prevent DNS rebinding. Fails closed on DNS errors.
-func ValidateURL(rawURL string, allowPrivate bool) error {
+func ValidateURL(ctx context.Context, rawURL string, allowPrivate bool) error {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Host == "" {
 		return fmt.Errorf("invalid URL: %q", rawURL)
@@ -60,9 +65,6 @@ func ValidateURL(rawURL string, allowPrivate bool) error {
 			return fmt.Errorf("blocked hostname: %s", host)
 		}
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	addrs, err := resolver.LookupHost(ctx, host)
 	if err != nil {
@@ -96,6 +98,6 @@ func ValidateURL(rawURL string, allowPrivate bool) error {
 
 // ValidateRedirectURL validates a URL encountered during a redirect chain.
 // Same rules as ValidateURL — re-validates at each hop.
-func ValidateRedirectURL(rawURL string, allowPrivate bool) error {
-	return ValidateURL(rawURL, allowPrivate)
+func ValidateRedirectURL(ctx context.Context, rawURL string, allowPrivate bool) error {
+	return ValidateURL(ctx, rawURL, allowPrivate)
 }
