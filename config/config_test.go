@@ -93,3 +93,14 @@ func TestRepoConfigLanguageFields(t *testing.T) {
 		t.Errorf("SandboxImage = %q, want %q", rc.SandboxImage, "factory-go:latest")
 	}
 }
+
+func TestSecurityConfigRoundTrip(t *testing.T) {
+	data := `{"allow_private_urls":true}`
+	var sc SecurityConfig
+	if err := json.Unmarshal([]byte(data), &sc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !sc.AllowPrivateURLs {
+		t.Error("AllowPrivateURLs should be true")
+	}
+}
