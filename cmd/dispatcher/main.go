@@ -165,8 +165,25 @@ func pollAllRepos(ctx context.Context, cfg config.Config) {
 	}
 }
 
+func selectSandboxImage(globalImage, repoImage string) string {
+	if repoImage != "" {
+		return repoImage
+	}
+	return globalImage
+}
+
+func repoSandboxImage(cfg config.Config, owner, repo string) string {
+	for _, r := range cfg.Repos {
+		if r.Owner == owner && r.Repo == repo {
+			return r.SandboxImage
+		}
+	}
+	return ""
+}
+
 func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, issue github.Issue) error {
 	log := slog.With("issue", issue.Number)
+	sandboxImage := repoSandboxImage(cfg, gh.Owner(), gh.Repo())
 
 	store := pipeline.NewFileStateStore(cfg.StateDir)
 	key := pipeline.StateKey(gh.Owner(), gh.Repo(), issue.Number)
@@ -206,7 +223,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	statePath := store.StatePath(key)
 
 	log.Info("starting gather phase")
-	if err := runPhase(ctx, &cfg, "gatherer", statePath, issue.Number); err != nil {
+	if err := runPhase(ctx, &cfg, "gatherer", statePath, issue.Number, sandboxImage); err != nil {
 		return fmt.Errorf("gather phase: %w", err)
 	}
 	state, err = store.Load(ctx, key)
@@ -218,7 +235,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	}
 
 	log.Info("starting research phase")
-	if err := runPhase(ctx, &cfg, "researcher", statePath, issue.Number); err != nil {
+	if err := runPhase(ctx, &cfg, "researcher", statePath, issue.Number, sandboxImage); err != nil {
 		log.Warn("research phase failed, continuing", "error", err)
 	} else {
 		state, err = store.Load(ctx, key)
@@ -231,7 +248,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	}
 
 	log.Info("starting plan phase")
-	if err := runPhase(ctx, &cfg, "planner", statePath, issue.Number); err != nil {
+	if err := runPhase(ctx, &cfg, "planner", statePath, issue.Number, sandboxImage); err != nil {
 		return fmt.Errorf("plan phase: %w", err)
 	}
 
@@ -276,7 +293,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		log.Info("starting design phase")
-		if err := runPhase(ctx, &cfg, "designer", statePath, issue.Number); err != nil {
+		if err := runPhase(ctx, &cfg, "designer", statePath, issue.Number, sandboxImage); err != nil {
 			return fmt.Errorf("design phase: %w", err)
 		}
 		state, err = store.Load(ctx, key)
@@ -288,7 +305,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		log.Info("starting code phase (includes review+iterate)")
-		if err := runPhase(ctx, &cfg, "coder", statePath, issue.Number); err != nil {
+		if err := runPhase(ctx, &cfg, "coder", statePath, issue.Number, sandboxImage); err != nil {
 			return fmt.Errorf("code phase: %w", err)
 		}
 		state, err = store.Load(ctx, key)
@@ -309,7 +326,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		log.Info("starting commit phase")
-		if err := runPhase(ctx, &cfg, "committer", statePath, issue.Number); err != nil {
+		if err := runPhase(ctx, &cfg, "committer", statePath, issue.Number, sandboxImage); err != nil {
 			return fmt.Errorf("commit phase: %w", err)
 		}
 
@@ -341,7 +358,7 @@ var sandboxMVPPhases = map[string]bool{
 
 const maxBackoff = 2 * time.Minute
 
-func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int) error {
+func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, repoImage string) error {
 	maxRetries := cfg.MaxPhaseRetries
 	if maxRetries < 0 {
 		maxRetries = 2
@@ -358,7 +375,7 @@ func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string,
 	if useSandbox {
 		sbxCfg = openshell.SandboxConfig{
 			Name:       openshell.SandboxName(binary, issueNumber),
-			Image:      cfg.Sandbox.Image,
+			Image:      selectSandboxImage(cfg.Sandbox.Image, repoImage),
 			PolicyPath: fmt.Sprintf("%s/%s.yaml", cfg.Sandbox.PolicyDir, binary),
 			Binary:     binary,
 			StatePath:  statePath,
