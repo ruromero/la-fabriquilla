@@ -16,7 +16,7 @@ func TestCheckCostBudget(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error when over budget")
 		}
-		want := "token budget exceeded: 1100 used, limit 1000"
+		want := "token budget exceeded: 1100 tokens used (limit 1000), estimated cost $0.0000"
 		if err.Error() != want {
 			t.Errorf("error = %q, want %q", err.Error(), want)
 		}

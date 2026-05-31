@@ -1,0 +1,8 @@
+# The planner endpoint is configurable (config.json planner.base_url).
+# Update this policy to match your configured endpoint.
+network:
+  default: deny
+  allow:
+    - endpoint: "generativelanguage.googleapis.com:443"
+      methods: [POST]
+      paths: ["/v1beta/openai/*"]

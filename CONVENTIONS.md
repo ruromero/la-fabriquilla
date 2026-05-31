@@ -25,6 +25,23 @@
 - Config is JSON file, not env vars
 - All untrusted input must pass through `sandbox.SanitizeInput`
 
+## Config
+
+- Config structs with `Enabled` flags must validate dependent fields
+  in `LoadConfig` — fail fast at startup, not at runtime
+- Network endpoints in deploy configs must match the actual deployment
+  topology (k8s service DNS, not localhost)
+
+## Sandbox / Container execution
+
+- Upload ALL files a sandboxed binary needs, not just the primary
+  state file — check every env var that points to a file path
+- Cleanup operations (sandbox destroy, temp file removal) must use a
+  bounded timeout (`context.WithTimeout(context.Background(), ...)`)
+  — never an unbounded context
+- Deterministic config (sandbox name, policy path) must be computed
+  once before retry loops, not rebuilt on each attempt
+
 ## Security
 
 - Credentials never appear in prompts, logs, or agent context

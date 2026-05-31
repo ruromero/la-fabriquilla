@@ -24,9 +24,17 @@ type Config struct {
 	MaxIssuesPerDay  int                  `json:"max_issues_per_day"`
 	BlockedPaths     []string             `json:"blocked_paths,omitempty"`
 	Serena           SerenaConfig         `json:"serena"`
+	Sandbox          SandboxConfig        `json:"sandbox,omitempty"`
 	Repos            []RepoConfig         `json:"repos"`
 	Apps             map[string]AppConfig `json:"apps,omitempty"`
 	StateDir         string               `json:"state_dir,omitempty"`
+}
+
+// SandboxConfig holds settings for OpenShell sandbox execution.
+type SandboxConfig struct {
+	Enabled   bool   `json:"enabled"`
+	PolicyDir string `json:"policy_dir,omitempty"`
+	Image     string `json:"image,omitempty"`
 }
 
 type AppConfig struct {
@@ -173,6 +181,15 @@ func LoadConfig(path string) (Config, error) {
 				app.PrivateKeyPath = globalKeyPath
 				cfg.Apps[role] = app
 			}
+		}
+	}
+
+	if cfg.Sandbox.Enabled {
+		if cfg.Sandbox.PolicyDir == "" {
+			return Config{}, fmt.Errorf("sandbox.policy_dir is required when sandbox is enabled")
+		}
+		if cfg.Sandbox.Image == "" {
+			return Config{}, fmt.Errorf("sandbox.image is required when sandbox is enabled")
 		}
 	}
 
