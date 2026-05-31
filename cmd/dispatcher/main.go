@@ -23,6 +23,47 @@ import (
 
 var configPath string
 
+type rateTracker struct {
+	hourly []time.Time
+	daily  []time.Time
+}
+
+func (r *rateTracker) record() {
+	now := time.Now()
+	r.hourly = append(r.hourly, now)
+	r.daily = append(r.daily, now)
+}
+
+func (r *rateTracker) pruneAndCheck(maxPerHour, maxPerDay int) error {
+	now := time.Now()
+	hourAgo := now.Add(-1 * time.Hour)
+	dayAgo := now.Add(-24 * time.Hour)
+
+	// Prune old entries
+	r.hourly = pruneOlderThan(r.hourly, hourAgo)
+	r.daily = pruneOlderThan(r.daily, dayAgo)
+
+	if maxPerHour > 0 && len(r.hourly) >= maxPerHour {
+		return fmt.Errorf("hourly rate limit reached: %d/%d issues in the last hour", len(r.hourly), maxPerHour)
+	}
+	if maxPerDay > 0 && len(r.daily) >= maxPerDay {
+		return fmt.Errorf("daily rate limit reached: %d/%d issues today", len(r.daily), maxPerDay)
+	}
+	return nil
+}
+
+func pruneOlderThan(times []time.Time, cutoff time.Time) []time.Time {
+	var result []time.Time
+	for _, t := range times {
+		if t.After(cutoff) {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+var rates rateTracker
+
 func main() {
 	flag.StringVar(&configPath, "config", "config.json", "path to config file")
 	flag.Parse()
@@ -100,6 +141,11 @@ func pollAllRepos(ctx context.Context, cfg config.Config) {
 		for _, issue := range issues {
 			log.Info("processing issue", "number", issue.Number, "title", issue.Title)
 
+			if err := rates.pruneAndCheck(cfg.MaxIssuesPerHour, cfg.MaxIssuesPerDay); err != nil {
+				log.Warn("rate limit exceeded, skipping remaining issues", "error", err)
+				break
+			}
+
 			if err := gh.AddLabel(ctx, issue.Number, "fabriquilla:in-progress"); err != nil {
 				log.Error("failed to add label", "issue", issue.Number, "error", err)
 				continue
@@ -111,6 +157,8 @@ func pollAllRepos(ctx context.Context, cfg config.Config) {
 			if err := processIssue(ctx, gh, cfg, issue); err != nil {
 				log.Error("failed to process issue", "issue", issue.Number, "error", err)
 				gh.AddLabel(ctx, issue.Number, "fabriquilla:needs-human")
+			} else {
+				rates.record()
 			}
 		}
 	}
@@ -160,10 +208,25 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	if err := runPhase(ctx, &cfg, "gatherer", statePath); err != nil {
 		return fmt.Errorf("gather phase: %w", err)
 	}
+	state, err = store.Load(ctx, key)
+	if err != nil {
+		return fmt.Errorf("reload state after gather: %w", err)
+	}
+	if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+		return fmt.Errorf("budget exceeded after gather: %w", err)
+	}
 
 	log.Info("starting research phase")
 	if err := runPhase(ctx, &cfg, "researcher", statePath); err != nil {
 		log.Warn("research phase failed, continuing", "error", err)
+	} else {
+		state, err = store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after research: %w", err)
+		}
+		if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after research: %w", err)
+		}
 	}
 
 	log.Info("starting plan phase")
@@ -174,6 +237,9 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	state, err = store.Load(ctx, key)
 	if err != nil {
 		return fmt.Errorf("reload state after plan: %w", err)
+	}
+	if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+		return fmt.Errorf("budget exceeded after plan: %w", err)
 	}
 
 	switch state.PlanOutcome {
@@ -212,10 +278,33 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		if err := runPhase(ctx, &cfg, "designer", statePath); err != nil {
 			return fmt.Errorf("design phase: %w", err)
 		}
+		state, err = store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after design: %w", err)
+		}
+		if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after design: %w", err)
+		}
 
 		log.Info("starting code phase (includes review+iterate)")
 		if err := runPhase(ctx, &cfg, "coder", statePath); err != nil {
 			return fmt.Errorf("code phase: %w", err)
+		}
+		state, err = store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after code: %w", err)
+		}
+		if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after code: %w", err)
+		}
+		if err := pipeline.CheckPRScope(state.Files, cfg.MaxFilesChanged, cfg.MaxPRSizeLines); err != nil {
+			return fmt.Errorf("scope check: %w", err)
+		}
+		if err := pipeline.ValidateFiles(state.Files, cfg.BlockedPaths); err != nil {
+			return fmt.Errorf("path validation: %w", err)
+		}
+		if violations := pipeline.ValidateContents(state.Files); len(violations) > 0 {
+			return fmt.Errorf("secret detected in generated code: %s in %s line %d", violations[0].Pattern, violations[0].File, violations[0].Line)
 		}
 
 		log.Info("starting commit phase")

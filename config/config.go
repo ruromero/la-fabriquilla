@@ -18,6 +18,11 @@ type Config struct {
 	MaxPhaseRetries  int                  `json:"max_phase_retries"`
 	PhaseDurations   map[string]Duration  `json:"phase_durations,omitempty"`
 	ShadowMode       bool                 `json:"shadow_mode"`
+	MaxFilesChanged  int                  `json:"max_files_changed"`
+	MaxPRSizeLines   int                  `json:"max_pr_size_lines"`
+	MaxIssuesPerHour int                  `json:"max_issues_per_hour"`
+	MaxIssuesPerDay  int                  `json:"max_issues_per_day"`
+	BlockedPaths     []string             `json:"blocked_paths,omitempty"`
 	Serena           SerenaConfig         `json:"serena"`
 	Repos            []RepoConfig         `json:"repos"`
 	Apps             map[string]AppConfig `json:"apps,omitempty"`
@@ -106,7 +111,21 @@ func LoadConfig(path string) (Config, error) {
 		MaxPhaseDuration: Duration{15 * time.Minute},
 		MaxPhaseRetries:  2,
 		ShadowMode:       true,
-		StateDir:         "/data/pipeline",
+		MaxFilesChanged:  20,
+		MaxPRSizeLines:   500,
+		MaxIssuesPerHour: 5,
+		MaxIssuesPerDay:  20,
+		BlockedPaths: []string{
+			".github/workflows/*",
+			"CODEOWNERS",
+			".pr_agent.toml",
+			"CONVENTIONS.md",
+			"ARCHITECTURE.md",
+			"CLAUDE.md",
+			".serena/*",
+			"deploy/*",
+		},
+		StateDir: "/data/pipeline",
 	}
 
 	if err := json.Unmarshal(data, &cfg); err != nil {
