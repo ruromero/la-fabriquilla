@@ -1,15 +1,19 @@
 package pipeline
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // CheckCostBudget returns an error if the pipeline has exceeded the token budget.
 func CheckCostBudget(state *State, maxTokens int) error {
-	if maxTokens <= 0 {
-		return nil // no budget configured
+	if state == nil || maxTokens <= 0 {
+		return nil
 	}
 	total := state.TotalPromptTokens + state.TotalCompTokens
 	if total > maxTokens {
-		return fmt.Errorf("token budget exceeded: %d used, limit %d", total, maxTokens)
+		return fmt.Errorf("token budget exceeded: %d tokens used (limit %d), estimated cost $%.4f",
+			total, maxTokens, state.TotalCostUSD)
 	}
 	return nil
 }
@@ -35,11 +39,5 @@ func countLines(s string) int {
 	if s == "" {
 		return 0
 	}
-	n := 1
-	for i := range s {
-		if s[i] == '\n' {
-			n++
-		}
-	}
-	return n
+	return strings.Count(s, "\n") + 1
 }

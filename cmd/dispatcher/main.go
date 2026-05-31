@@ -303,6 +303,9 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		if err := pipeline.ValidateFiles(state.Files, cfg.BlockedPaths); err != nil {
 			return fmt.Errorf("path validation: %w", err)
 		}
+		if violations := pipeline.ValidateContents(state.Files); len(violations) > 0 {
+			return fmt.Errorf("secret detected in generated code: %s in %s line %d", violations[0].Pattern, violations[0].File, violations[0].Line)
+		}
 
 		log.Info("starting commit phase")
 		if err := runPhase(ctx, &cfg, "committer", statePath); err != nil {
