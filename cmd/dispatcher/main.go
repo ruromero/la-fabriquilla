@@ -17,6 +17,7 @@ import (
 	"github.com/ruromero/la-fabriquilla/config"
 	"github.com/ruromero/la-fabriquilla/github"
 	"github.com/ruromero/la-fabriquilla/harness"
+	"github.com/ruromero/la-fabriquilla/openshell"
 	"github.com/ruromero/la-fabriquilla/pipeline"
 	"github.com/ruromero/la-fabriquilla/sandbox"
 )
@@ -205,7 +206,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	statePath := store.StatePath(key)
 
 	log.Info("starting gather phase")
-	if err := runPhase(ctx, &cfg, "gatherer", statePath); err != nil {
+	if err := runPhase(ctx, &cfg, "gatherer", statePath, issue.Number); err != nil {
 		return fmt.Errorf("gather phase: %w", err)
 	}
 	state, err = store.Load(ctx, key)
@@ -217,7 +218,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	}
 
 	log.Info("starting research phase")
-	if err := runPhase(ctx, &cfg, "researcher", statePath); err != nil {
+	if err := runPhase(ctx, &cfg, "researcher", statePath, issue.Number); err != nil {
 		log.Warn("research phase failed, continuing", "error", err)
 	} else {
 		state, err = store.Load(ctx, key)
@@ -230,7 +231,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 	}
 
 	log.Info("starting plan phase")
-	if err := runPhase(ctx, &cfg, "planner", statePath); err != nil {
+	if err := runPhase(ctx, &cfg, "planner", statePath, issue.Number); err != nil {
 		return fmt.Errorf("plan phase: %w", err)
 	}
 
@@ -275,7 +276,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		log.Info("starting design phase")
-		if err := runPhase(ctx, &cfg, "designer", statePath); err != nil {
+		if err := runPhase(ctx, &cfg, "designer", statePath, issue.Number); err != nil {
 			return fmt.Errorf("design phase: %w", err)
 		}
 		state, err = store.Load(ctx, key)
@@ -287,7 +288,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		log.Info("starting code phase (includes review+iterate)")
-		if err := runPhase(ctx, &cfg, "coder", statePath); err != nil {
+		if err := runPhase(ctx, &cfg, "coder", statePath, issue.Number); err != nil {
 			return fmt.Errorf("code phase: %w", err)
 		}
 		state, err = store.Load(ctx, key)
@@ -308,7 +309,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		log.Info("starting commit phase")
-		if err := runPhase(ctx, &cfg, "committer", statePath); err != nil {
+		if err := runPhase(ctx, &cfg, "committer", statePath, issue.Number); err != nil {
 			return fmt.Errorf("commit phase: %w", err)
 		}
 
@@ -332,9 +333,15 @@ var noRetryPhases = map[string]bool{
 	"committer": true,
 }
 
+// sandboxMVPPhases lists phases enabled for sandbox execution in the MVP.
+// Expand this set as sandbox images and policies are validated per phase.
+var sandboxMVPPhases = map[string]bool{
+	"coder": true,
+}
+
 const maxBackoff = 2 * time.Minute
 
-func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string) error {
+func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int) error {
 	maxRetries := cfg.MaxPhaseRetries
 	if maxRetries < 0 {
 		maxRetries = 2
@@ -343,6 +350,9 @@ func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string)
 		maxRetries = 0
 	}
 	timeout := cfg.PhaseDuration(binary)
+	useSandbox := cfg.Sandbox.Enabled && sandboxMVPPhases[binary]
+
+	slog.Info("running phase", "phase", binary, "sandboxed", useSandbox)
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -362,14 +372,32 @@ func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string)
 		}
 
 		phaseCtx, cancel := context.WithTimeout(ctx, timeout)
-		cmd := exec.CommandContext(phaseCtx, binary)
-		cmd.Env = append(os.Environ(),
-			"PIPELINE_STATE_PATH="+statePath,
-			"CONFIG_PATH="+configPath,
-		)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err := cmd.Run()
+
+		var err error
+		if useSandbox {
+			policyPath := fmt.Sprintf("%s/%s.yaml", cfg.Sandbox.PolicyDir, binary)
+			err = openshell.RunInSandbox(phaseCtx, openshell.SandboxConfig{
+				Name:       openshell.SandboxName(binary, issueNumber),
+				Image:      cfg.Sandbox.Image,
+				PolicyPath: policyPath,
+				Binary:     binary,
+				StatePath:  statePath,
+				Env: []string{
+					"PIPELINE_STATE_PATH=/work/state.json",
+					"CONFIG_PATH=/work/config.json",
+				},
+			})
+		} else {
+			cmd := exec.CommandContext(phaseCtx, binary)
+			cmd.Env = append(os.Environ(),
+				"PIPELINE_STATE_PATH="+statePath,
+				"CONFIG_PATH="+configPath,
+			)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err = cmd.Run()
+		}
+
 		// Check phaseCtx before cancel — exec.CommandContext sends SIGKILL
 		// on deadline, but the resulting ExitError doesn't wrap DeadlineExceeded.
 		timedOut := phaseCtx.Err() == context.DeadlineExceeded

@@ -12,6 +12,11 @@
     "command": "serena",
     "args": ["start-mcp-server"]
   },
+  "sandbox": {
+    "enabled": false,
+    "policy_dir": "/etc/fabriquilla/sandbox-policies",
+    "image": "factory-go:latest"
+  },
   "repos": [
     {
       "owner": "ruromero",
