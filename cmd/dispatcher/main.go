@@ -354,6 +354,22 @@ func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string,
 
 	slog.Info("running phase", "phase", binary, "sandboxed", useSandbox)
 
+	var sbxCfg openshell.SandboxConfig
+	if useSandbox {
+		sbxCfg = openshell.SandboxConfig{
+			Name:       openshell.SandboxName(binary, issueNumber),
+			Image:      cfg.Sandbox.Image,
+			PolicyPath: fmt.Sprintf("%s/%s.yaml", cfg.Sandbox.PolicyDir, binary),
+			Binary:     binary,
+			StatePath:  statePath,
+			ConfigPath: configPath,
+			Env: []string{
+				"PIPELINE_STATE_PATH=/work/state.json",
+				"CONFIG_PATH=/work/config.json",
+			},
+		}
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -375,18 +391,7 @@ func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string,
 
 		var err error
 		if useSandbox {
-			policyPath := fmt.Sprintf("%s/%s.yaml", cfg.Sandbox.PolicyDir, binary)
-			err = openshell.RunInSandbox(phaseCtx, openshell.SandboxConfig{
-				Name:       openshell.SandboxName(binary, issueNumber),
-				Image:      cfg.Sandbox.Image,
-				PolicyPath: policyPath,
-				Binary:     binary,
-				StatePath:  statePath,
-				Env: []string{
-					"PIPELINE_STATE_PATH=/work/state.json",
-					"CONFIG_PATH=/work/config.json",
-				},
-			})
+			err = openshell.RunInSandbox(phaseCtx, sbxCfg)
 		} else {
 			cmd := exec.CommandContext(phaseCtx, binary)
 			cmd.Env = append(os.Environ(),

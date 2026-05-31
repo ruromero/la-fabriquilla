@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // SandboxConfig holds the parameters for running a phase binary inside
@@ -17,6 +18,7 @@ type SandboxConfig struct {
 	PolicyPath string
 	Binary     string
 	StatePath  string
+	ConfigPath string
 	Env        []string
 }
 
@@ -36,6 +38,9 @@ func (c SandboxConfig) Validate() error {
 	}
 	if c.StatePath == "" {
 		return fmt.Errorf("sandbox state path is required")
+	}
+	if c.ConfigPath == "" {
+		return fmt.Errorf("sandbox config path is required")
 	}
 	return nil
 }
@@ -71,16 +76,23 @@ func RunInSandbox(ctx context.Context, cfg SandboxConfig) error {
 
 	defer func() {
 		log.Info("destroying sandbox")
-		rmCtx := context.WithoutCancel(ctx)
+		rmCtx, rmCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer rmCancel()
 		if err := run(rmCtx, log, "openshell", "sandbox", "rm", cfg.Name); err != nil {
 			log.Error("failed to destroy sandbox", "error", err)
 		}
 	}()
 
 	log.Info("uploading state")
-	remotePath := cfg.Name + ":/work/state.json"
-	if err := run(ctx, log, "openshell", "sandbox", "cp", cfg.StatePath, remotePath); err != nil {
+	remoteState := cfg.Name + ":/work/state.json"
+	if err := run(ctx, log, "openshell", "sandbox", "cp", cfg.StatePath, remoteState); err != nil {
 		return fmt.Errorf("upload state to %s: %w", cfg.Name, err)
+	}
+
+	log.Info("uploading config")
+	remoteConfig := cfg.Name + ":/work/config.json"
+	if err := run(ctx, log, "openshell", "sandbox", "cp", cfg.ConfigPath, remoteConfig); err != nil {
+		return fmt.Errorf("upload config to %s: %w", cfg.Name, err)
 	}
 
 	log.Info("executing phase binary")
@@ -94,7 +106,7 @@ func RunInSandbox(ctx context.Context, cfg SandboxConfig) error {
 	}
 
 	log.Info("downloading state")
-	if err := run(ctx, log, "openshell", "sandbox", "cp", remotePath, cfg.StatePath); err != nil {
+	if err := run(ctx, log, "openshell", "sandbox", "cp", remoteState, cfg.StatePath); err != nil {
 		return fmt.Errorf("download state from %s: %w", cfg.Name, err)
 	}
 

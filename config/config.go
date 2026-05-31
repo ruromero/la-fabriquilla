@@ -184,6 +184,15 @@ func LoadConfig(path string) (Config, error) {
 		}
 	}
 
+	if cfg.Sandbox.Enabled {
+		if cfg.Sandbox.PolicyDir == "" {
+			return Config{}, fmt.Errorf("sandbox.policy_dir is required when sandbox is enabled")
+		}
+		if cfg.Sandbox.Image == "" {
+			return Config{}, fmt.Errorf("sandbox.image is required when sandbox is enabled")
+		}
+	}
+
 	if len(cfg.Repos) == 0 {
 		return Config{}, fmt.Errorf("no repos configured")
 	}

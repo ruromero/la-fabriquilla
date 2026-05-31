@@ -35,6 +35,7 @@ func TestSandboxConfig_Validate(t *testing.T) {
 		PolicyPath: "/etc/policies/coder.yaml",
 		Binary:     "coder",
 		StatePath:  "/data/pipeline/owner/repo/42.json",
+		ConfigPath: "/etc/fabriquilla/config.json",
 	}
 
 	t.Run("valid config", func(t *testing.T) {
@@ -52,6 +53,7 @@ func TestSandboxConfig_Validate(t *testing.T) {
 		{"policy path", func(c SandboxConfig) SandboxConfig { c.PolicyPath = ""; return c }},
 		{"binary", func(c SandboxConfig) SandboxConfig { c.Binary = ""; return c }},
 		{"state path", func(c SandboxConfig) SandboxConfig { c.StatePath = ""; return c }},
+		{"config path", func(c SandboxConfig) SandboxConfig { c.ConfigPath = ""; return c }},
 	}
 	for _, f := range fields {
 		t.Run("missing "+f.name, func(t *testing.T) {
@@ -79,6 +81,7 @@ func TestRunInSandbox_CommandSequence(t *testing.T) {
 		PolicyPath: "/policies/coder.yaml",
 		Binary:     "coder",
 		StatePath:  "/data/state.json",
+		ConfigPath: "/etc/config.json",
 		Env:        []string{"PIPELINE_STATE_PATH=/work/state.json", "CONFIG_PATH=/work/config.json"},
 	}
 
@@ -90,6 +93,7 @@ func TestRunInSandbox_CommandSequence(t *testing.T) {
 	expected := []string{
 		"openshell sandbox create --name factory-coder-42 --image factory-go:latest --policy /policies/coder.yaml",
 		"openshell sandbox cp /data/state.json factory-coder-42:/work/state.json",
+		"openshell sandbox cp /etc/config.json factory-coder-42:/work/config.json",
 		"openshell sandbox exec --env PIPELINE_STATE_PATH=/work/state.json --env CONFIG_PATH=/work/config.json factory-coder-42 -- /usr/local/bin/coder",
 		"openshell sandbox cp factory-coder-42:/work/state.json /data/state.json",
 		"openshell sandbox rm factory-coder-42",
@@ -124,6 +128,7 @@ func TestRunInSandbox_DestroyOnExecFailure(t *testing.T) {
 		PolicyPath: "/policies/coder.yaml",
 		Binary:     "coder",
 		StatePath:  "/data/state.json",
+		ConfigPath: "/etc/config.json",
 	}
 
 	err := RunInSandbox(context.Background(), cfg)
@@ -167,6 +172,7 @@ func TestRunInSandbox_CreateFailure(t *testing.T) {
 		PolicyPath: "/policies/coder.yaml",
 		Binary:     "coder",
 		StatePath:  "/data/state.json",
+		ConfigPath: "/etc/config.json",
 	}
 
 	err := RunInSandbox(context.Background(), cfg)
@@ -201,6 +207,7 @@ func TestRunInSandbox_NoEnvVars(t *testing.T) {
 		PolicyPath: "/policies/coder.yaml",
 		Binary:     "coder",
 		StatePath:  "/data/state.json",
+		ConfigPath: "/etc/config.json",
 	}
 
 	if err := RunInSandbox(context.Background(), cfg); err != nil {
