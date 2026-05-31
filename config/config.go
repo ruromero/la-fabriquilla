@@ -74,6 +74,8 @@ func (c *Config) PhaseDuration(phase string) time.Duration {
 type RepoConfig struct {
 	Owner          string `json:"owner"`
 	Repo           string `json:"repo"`
+	Language       string `json:"language,omitempty"`
+	SandboxImage   string `json:"sandbox_image,omitempty"`
 	Token          string `json:"token,omitempty"`
 	AppID          int64  `json:"app_id,omitempty"`
 	PrivateKeyPath string `json:"private_key_path,omitempty"`

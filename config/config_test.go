@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -76,5 +77,19 @@ func TestPhaseDuration(t *testing.T) {
 				t.Errorf("PhaseDuration(%q) = %v, want %v", tt.phase, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRepoConfigLanguageFields(t *testing.T) {
+	data := `{"owner":"acme","repo":"app","language":"go","sandbox_image":"factory-go:latest","token":"t"}`
+	var rc RepoConfig
+	if err := json.Unmarshal([]byte(data), &rc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if rc.Language != "go" {
+		t.Errorf("Language = %q, want %q", rc.Language, "go")
+	}
+	if rc.SandboxImage != "factory-go:latest" {
+		t.Errorf("SandboxImage = %q, want %q", rc.SandboxImage, "factory-go:latest")
 	}
 }
