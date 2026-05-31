@@ -390,9 +390,16 @@ func runPhase(ctx context.Context, cfg *config.Config, binary, statePath string,
 		phaseCtx, cancel := context.WithTimeout(ctx, timeout)
 
 		var err error
-		if useSandbox {
+		sandboxed := useSandbox
+		if sandboxed {
 			err = openshell.RunInSandbox(phaseCtx, sbxCfg)
-		} else {
+			if errors.Is(err, openshell.ErrUnavailable) {
+				slog.Warn("openshell not available, falling back to subprocess", "phase", binary)
+				sandboxed = false
+				err = nil
+			}
+		}
+		if !sandboxed {
 			cmd := exec.CommandContext(phaseCtx, binary)
 			cmd.Env = append(os.Environ(),
 				"PIPELINE_STATE_PATH="+statePath,

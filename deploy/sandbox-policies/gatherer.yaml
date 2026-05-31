@@ -1,6 +1,6 @@
 network:
   default: deny
   allow:
-    - endpoint: "ollama.ai.svc:11434"
+    - endpoint: "ollama.ai.svc.cluster.local:11434"
       methods: [POST]
       paths: ["/api/chat"]

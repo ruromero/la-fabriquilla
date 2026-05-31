@@ -2,6 +2,7 @@ package openshell
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -65,7 +66,15 @@ func TestSandboxConfig_Validate(t *testing.T) {
 	}
 }
 
+func stubLookPath(t *testing.T) {
+	t.Helper()
+	origLookPath := lookPath
+	lookPath = func(file string) (string, error) { return "/usr/bin/" + file, nil }
+	t.Cleanup(func() { lookPath = origLookPath })
+}
+
 func TestRunInSandbox_CommandSequence(t *testing.T) {
+	stubLookPath(t)
 	var commands []string
 	origRunner := cmdRunner
 	cmdRunner = func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -91,6 +100,7 @@ func TestRunInSandbox_CommandSequence(t *testing.T) {
 	}
 
 	expected := []string{
+		"openshell sandbox rm factory-coder-42",
 		"openshell sandbox create --name factory-coder-42 --image factory-go:latest --policy /policies/coder.yaml",
 		"openshell sandbox cp /data/state.json factory-coder-42:/work/state.json",
 		"openshell sandbox cp /etc/config.json factory-coder-42:/work/config.json",
@@ -110,6 +120,7 @@ func TestRunInSandbox_CommandSequence(t *testing.T) {
 }
 
 func TestRunInSandbox_DestroyOnExecFailure(t *testing.T) {
+	stubLookPath(t)
 	var commands []string
 	origRunner := cmdRunner
 	cmdRunner = func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -154,6 +165,7 @@ func TestRunInSandbox_ValidationError(t *testing.T) {
 }
 
 func TestRunInSandbox_CreateFailure(t *testing.T) {
+	stubLookPath(t)
 	var commands []string
 	origRunner := cmdRunner
 	cmdRunner = func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -180,18 +192,43 @@ func TestRunInSandbox_CreateFailure(t *testing.T) {
 		t.Fatal("expected error from create failure")
 	}
 
-	if len(commands) != 1 {
-		t.Errorf("expected only 1 command (create), got %d: %s", len(commands), strings.Join(commands, "\n"))
+	// Pre-create cleanup rm + failed create = 2 commands.
+	// No post-failure rm because create failed (defer not registered).
+	if len(commands) != 2 {
+		t.Errorf("expected 2 commands (pre-cleanup rm + create), got %d: %s", len(commands), strings.Join(commands, "\n"))
 	}
-
-	for _, cmd := range commands {
-		if strings.Contains(cmd, "sandbox rm") {
-			t.Error("sandbox rm should not be called when create fails")
+	if len(commands) >= 2 {
+		if !strings.Contains(commands[0], "sandbox rm") {
+			t.Errorf("first command should be pre-cleanup rm, got: %s", commands[0])
+		}
+		if !strings.Contains(commands[1], "sandbox create") {
+			t.Errorf("second command should be create, got: %s", commands[1])
 		}
 	}
 }
 
+func TestRunInSandbox_ErrUnavailable(t *testing.T) {
+	origLookPath := lookPath
+	lookPath = func(file string) (string, error) { return "", exec.ErrNotFound }
+	defer func() { lookPath = origLookPath }()
+
+	cfg := SandboxConfig{
+		Name:       "factory-coder-1",
+		Image:      "factory-go:latest",
+		PolicyPath: "/policies/coder.yaml",
+		Binary:     "coder",
+		StatePath:  "/data/state.json",
+		ConfigPath: "/etc/config.json",
+	}
+
+	err := RunInSandbox(context.Background(), cfg)
+	if !errors.Is(err, ErrUnavailable) {
+		t.Errorf("expected ErrUnavailable, got %v", err)
+	}
+}
+
 func TestRunInSandbox_NoEnvVars(t *testing.T) {
+	stubLookPath(t)
 	var commands []string
 	origRunner := cmdRunner
 	cmdRunner = func(ctx context.Context, name string, args ...string) *exec.Cmd {

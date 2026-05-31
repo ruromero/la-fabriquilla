@@ -1,3 +1,5 @@
+# The planner endpoint is configurable (config.json planner.base_url).
+# Update this policy to match your configured endpoint.
 network:
   default: deny
   allow:

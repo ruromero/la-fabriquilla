@@ -2,6 +2,7 @@ package openshell
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,6 +10,10 @@ import (
 	"strings"
 	"time"
 )
+
+// ErrUnavailable is returned when the openshell CLI is not installed.
+// Callers should fall back to direct subprocess execution.
+var ErrUnavailable = errors.New("openshell CLI not found in PATH")
 
 // SandboxConfig holds the parameters for running a phase binary inside
 // an OpenShell sandbox.
@@ -55,6 +60,9 @@ var cmdRunner = func(ctx context.Context, name string, args ...string) *exec.Cmd
 	return exec.CommandContext(ctx, name, args...)
 }
 
+// lookPath abstracts exec.LookPath for testing.
+var lookPath = exec.LookPath
+
 // RunInSandbox executes a phase binary inside an OpenShell sandbox.
 // The lifecycle is: create → upload state → exec binary → download state → destroy.
 // The sandbox is always destroyed on exit, even if an earlier step fails.
@@ -63,7 +71,14 @@ func RunInSandbox(ctx context.Context, cfg SandboxConfig) error {
 		return fmt.Errorf("sandbox config: %w", err)
 	}
 
+	if _, err := lookPath("openshell"); err != nil {
+		return ErrUnavailable
+	}
+
 	log := slog.With("sandbox", cfg.Name, "phase", cfg.Binary)
+
+	// Best-effort cleanup of any leftover sandbox from a previous failed attempt.
+	_ = run(ctx, log, "openshell", "sandbox", "rm", cfg.Name)
 
 	log.Info("creating sandbox")
 	if err := run(ctx, log, "openshell", "sandbox", "create",
