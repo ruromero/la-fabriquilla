@@ -25,6 +25,7 @@ type Config struct {
 	BlockedPaths     []string             `json:"blocked_paths,omitempty"`
 	Serena           SerenaConfig         `json:"serena"`
 	Sandbox          SandboxConfig        `json:"sandbox,omitempty"`
+	Security         SecurityConfig       `json:"security,omitempty"`
 	Repos            []RepoConfig         `json:"repos"`
 	Apps             map[string]AppConfig `json:"apps,omitempty"`
 	StateDir         string               `json:"state_dir,omitempty"`
@@ -47,6 +48,11 @@ type PlannerConfig struct {
 	BaseURL string `json:"base_url"`
 	Model   string `json:"model"`
 	APIKey  string `json:"api_key,omitempty"`
+}
+
+// SecurityConfig holds security-related settings.
+type SecurityConfig struct {
+	AllowPrivateURLs bool `json:"allow_private_urls"`
 }
 
 type SerenaConfig struct {
