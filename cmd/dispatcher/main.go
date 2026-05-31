@@ -175,7 +175,13 @@ func selectSandboxImage(globalImage, repoImage string) string {
 func repoSandboxImage(cfg config.Config, owner, repo string) string {
 	for _, r := range cfg.Repos {
 		if r.Owner == owner && r.Repo == repo {
-			return r.SandboxImage
+			if r.SandboxImage != "" {
+				return r.SandboxImage
+			}
+			if r.Language != "" {
+				return "factory-" + r.Language + ":latest"
+			}
+			return ""
 		}
 	}
 	return ""

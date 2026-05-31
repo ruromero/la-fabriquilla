@@ -1,4 +1,5 @@
-FROM factory-base:latest
+ARG BASE_IMAGE=factory-base:latest
+FROM ${BASE_IMAGE}
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
