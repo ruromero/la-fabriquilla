@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/pipeline"
 )
 
@@ -41,45 +41,46 @@ type IterateResult struct {
 	Model        string
 }
 
-func Iterate(ctx context.Context, ol *ollama.Client, code, reviewFeedback string, tools []ollama.Tool, handler ollama.ToolHandler) (string, error) {
-	r, err := IterateWithUsage(ctx, ol, code, reviewFeedback, tools, handler)
+func Iterate(ctx context.Context, cl *inference.Client, code, reviewFeedback string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
+	r, err := IterateWithUsage(ctx, cl, code, reviewFeedback, tools, handler)
 	return r.Content, err
 }
 
 // IterateWithUsage works like Iterate but also returns token usage.
-func IterateWithUsage(ctx context.Context, ol *ollama.Client, code, reviewFeedback string, tools []ollama.Tool, handler ollama.ToolHandler) (IterateResult, error) {
+func IterateWithUsage(ctx context.Context, cl *inference.Client, code, reviewFeedback string, tools []inference.Tool, handler inference.ToolHandler) (IterateResult, error) {
 	userPrompt := fmt.Sprintf("## Current Code\n\n%s\n\n## Review Feedback\n\n%s", code, reviewFeedback)
 
-	req := ollama.ChatRequest{
+	temp := float64(0)
+	req := inference.ChatRequest{
 		Model: coderModel,
-		Messages: []ollama.Message{
+		Messages: []inference.Message{
 			{Role: "system", Content: iteratorSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Tools:   tools,
-		Options: &ollama.Options{Temperature: 0},
+		Tools:       tools,
+		Temperature: &temp,
 	}
 
-	var resp ollama.ChatResponse
+	var resp inference.ChatResponse
 	var err error
 	if len(tools) > 0 && handler != nil {
-		resp, err = ol.ChatWithTools(ctx, req, handler, 20)
+		resp, err = cl.ChatWithTools(ctx, req, handler, 20)
 		if err != nil {
 			return IterateResult{}, fmt.Errorf("iterate with tools: %w", err)
 		}
 	} else {
-		req.Format = pipeline.GetCoderOutputSchema()
-		resp, err = ol.Chat(ctx, req)
+		req.ResponseFormat = inference.StructuredOutput(pipeline.GetCoderOutputSchema())
+		resp, err = cl.Chat(ctx, req)
 		if err != nil {
 			return IterateResult{}, fmt.Errorf("iterate chat: %w", err)
 		}
 	}
 
 	return IterateResult{
-		Content:      resp.Message.Content,
-		PromptTokens: resp.PromptEvalCount,
-		CompTokens:   resp.EvalCount,
-		ToolCalls:    resp.ToolCallCount,
+		Content:      resp.Choices[0].Message.Content,
+		PromptTokens: resp.Usage.PromptTokens,
+		CompTokens:   resp.Usage.CompletionTokens,
+		ToolCalls:    resp.Usage.ToolCallCount,
 		Model:        coderModel,
 	}, nil
 }

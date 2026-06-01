@@ -49,9 +49,8 @@ openshell/   OpenShell sandbox lifecycle management
 sandbox/     Input sanitization (Unicode, secrets redaction, URL validation)
 eval/        Golden-set test case runner and reporting
 github/      GitHub REST API client, App auth, readiness checks
-ollama/      Ollama inference API + tool-calling loop
-gemini/      Gemini API client
-openai/      OpenAI-compatible API client
+inference/   OpenAI-compatible inference client + tool-calling loop
+gemini/      Gemini API client (research phase)
 mcp/         MCP client (JSON-RPC over stdio)
 traces/      Structured JSON trace logging (minimal)
 ```
@@ -618,7 +617,7 @@ Following [fullsend](https://github.com/fullsend-ai/fullsend) patterns,
 the system separates concerns into layers:
 
 - **Dispatch** (`cmd/dispatcher/`) — poll loop, repo iteration, label state machine
-- **Infrastructure** (`github/`, `ollama/`, `gemini/`, `openai/`) — API clients, authentication, credential management
+- **Infrastructure** (`github/`, `inference/`, `gemini/`) — API clients, authentication, credential management
 - **Sandbox** (`sandbox/`, `openshell/`) — input sanitization, sandbox isolation
 - **Harness** (`harness/`) — assembles phase context from repo docs and prior phase outputs
 - **Runtime** (`agents/`) — LLM prompts and response parsing, no business logic
@@ -661,7 +660,7 @@ fabriquilla:ready → fabriquilla:in-progress → fabriquilla:done
 ## 16. Key Interfaces
 
 - `github.TokenSource` — `Token(ctx) (string, error)` — implemented by `staticToken` and `AppAuth`
-- `ollama.ToolHandler` — `Execute(ctx, name, args) (string, error)` — implemented by `mcp.Client`, `ContextToolHandler`, `CompositeToolHandler`
+- `inference.ToolHandler` — `Execute(ctx, name, args) (string, error)` — implemented by `mcp.Client`, `ContextToolHandler`, `CompositeToolHandler`
 - `pipeline.StateStore` — `Save`/`Load` for pipeline state — implemented by `FileStateStore`
 
 ---

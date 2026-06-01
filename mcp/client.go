@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 // Client communicates with an MCP server over stdio using JSON-RPC 2.0.
@@ -20,7 +20,7 @@ type Client struct {
 	dec    *json.Decoder
 	mu     sync.Mutex
 	nextID atomic.Int64
-	tools  []ollama.Tool
+	tools  []inference.Tool
 }
 
 type jsonRPCRequest struct {
@@ -87,11 +87,11 @@ func (c *Client) Stop() error {
 	return c.cmd.Wait()
 }
 
-func (c *Client) Tools() []ollama.Tool {
+func (c *Client) Tools() []inference.Tool {
 	return c.tools
 }
 
-// Execute implements ollama.ToolHandler.
+// Execute implements inference.ToolHandler.
 func (c *Client) Execute(ctx context.Context, name string, args map[string]any) (string, error) {
 	result, err := c.call(ctx, "tools/call", map[string]any{
 		"name":      name,
@@ -120,11 +120,11 @@ func (c *Client) refreshTools(ctx context.Context) error {
 		return fmt.Errorf("decode tools: %w", err)
 	}
 
-	c.tools = make([]ollama.Tool, len(toolList.Tools))
+	c.tools = make([]inference.Tool, len(toolList.Tools))
 	for i, t := range toolList.Tools {
-		c.tools[i] = ollama.Tool{
+		c.tools[i] = inference.Tool{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        t.Name,
 				Description: t.Description,
 				Parameters:  t.InputSchema,

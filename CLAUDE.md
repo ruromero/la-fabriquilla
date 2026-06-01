@@ -30,7 +30,8 @@ CGO_ENABLED=0 go build ./...
 - The orchestrator handles mechanics only — all judgment is deferred
   to LLMs via prompts (zero framework cognition principle)
 - Config is a JSON file, not env vars (supports multi-repo)
-- Ollama models support function calling for MCP tool integration
+- Inference uses OpenAI-compatible API (works with Ollama, DeepSeek, Gemini, etc.)
+- Models support function calling for MCP tool integration
 - Single GPU (RTX 3060 12GB) shared across all repos — only one
   inference runs at a time
 
@@ -41,7 +42,7 @@ CGO_ENABLED=0 go build ./...
 - cmd/internal/ — shared helpers (config/state loading, GitHub client)
 - config/ — shared configuration types
 - github/ — GitHub API client (issues, PRs, comments, labels)
-- ollama/ — Ollama API client (chat + tool-calling loop)
+- inference/ — OpenAI-compatible inference client (chat + tool-calling loop)
 - gemini/ — Gemini API client (research phase)
 - mcp/ — MCP client (JSON-RPC over stdio, tool discovery)
 - sandbox/ — input sanitization (Unicode normalization)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 const designerModel = "qwen3:14b"
@@ -27,13 +27,13 @@ type DesignResult struct {
 	Model        string
 }
 
-func Design(ctx context.Context, ol *ollama.Client, plan, researchContext, conventions string) (string, error) {
-	r, err := DesignWithUsage(ctx, ol, plan, researchContext, conventions)
+func Design(ctx context.Context, cl *inference.Client, plan, researchContext, conventions string) (string, error) {
+	r, err := DesignWithUsage(ctx, cl, plan, researchContext, conventions)
 	return r.Content, err
 }
 
 // DesignWithUsage works like Design but also returns token usage.
-func DesignWithUsage(ctx context.Context, ol *ollama.Client, plan, researchContext, conventions string) (DesignResult, error) {
+func DesignWithUsage(ctx context.Context, cl *inference.Client, plan, researchContext, conventions string) (DesignResult, error) {
 	userPrompt := fmt.Sprintf("## Implementation Plan\n\n%s", plan)
 	if conventions != "" {
 		userPrompt += fmt.Sprintf("\n\n## Project Conventions\n\nFollow these conventions:\n\n%s", conventions)
@@ -42,22 +42,23 @@ func DesignWithUsage(ctx context.Context, ol *ollama.Client, plan, researchConte
 		userPrompt += fmt.Sprintf("\n\n## Research Context\n\n%s", researchContext)
 	}
 
-	resp, err := ol.Chat(ctx, ollama.ChatRequest{
+	temp := float64(0)
+	resp, err := cl.Chat(ctx, inference.ChatRequest{
 		Model: designerModel,
-		Messages: []ollama.Message{
+		Messages: []inference.Message{
 			{Role: "system", Content: designerSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Options: &ollama.Options{Temperature: 0},
+		Temperature: &temp,
 	})
 	if err != nil {
 		return DesignResult{}, fmt.Errorf("designer chat: %w", err)
 	}
 
 	return DesignResult{
-		Content:      resp.Message.Content,
-		PromptTokens: resp.PromptEvalCount,
-		CompTokens:   resp.EvalCount,
+		Content:      resp.Choices[0].Message.Content,
+		PromptTokens: resp.Usage.PromptTokens,
+		CompTokens:   resp.Usage.CompletionTokens,
 		Model:        designerModel,
 	}, nil
 }

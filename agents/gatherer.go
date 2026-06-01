@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 const gathererModel = "qwen3:14b"
@@ -60,33 +60,34 @@ type GatherResult struct {
 	Model        string
 }
 
-func GatherContext(ctx context.Context, ol *ollama.Client, issueTitle, issueBody, summaries string, tools []ollama.Tool, handler ollama.ToolHandler) (string, error) {
-	r, err := GatherContextWithUsage(ctx, ol, issueTitle, issueBody, summaries, tools, handler)
+func GatherContext(ctx context.Context, cl *inference.Client, issueTitle, issueBody, summaries string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
+	r, err := GatherContextWithUsage(ctx, cl, issueTitle, issueBody, summaries, tools, handler)
 	return r.Content, err
 }
 
 // GatherContextWithUsage works like GatherContext but also returns token usage.
-func GatherContextWithUsage(ctx context.Context, ol *ollama.Client, issueTitle, issueBody, summaries string, tools []ollama.Tool, handler ollama.ToolHandler) (GatherResult, error) {
+func GatherContextWithUsage(ctx context.Context, cl *inference.Client, issueTitle, issueBody, summaries string, tools []inference.Tool, handler inference.ToolHandler) (GatherResult, error) {
 	userPrompt := fmt.Sprintf("## Issue: %s\n\n%s\n\n## Project Summaries\n\n%s", issueTitle, issueBody, summaries)
 
-	resp, err := ol.ChatWithTools(ctx, ollama.ChatRequest{
+	temp := float64(0)
+	resp, err := cl.ChatWithTools(ctx, inference.ChatRequest{
 		Model: gathererModel,
-		Messages: []ollama.Message{
+		Messages: []inference.Message{
 			{Role: "system", Content: gathererSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Tools:   tools,
-		Options: &ollama.Options{Temperature: 0},
+		Tools:       tools,
+		Temperature: &temp,
 	}, handler, maxGatherCalls)
 	if err != nil {
 		return GatherResult{}, fmt.Errorf("gatherer: %w", err)
 	}
 
 	return GatherResult{
-		Content:      resp.Message.Content,
-		PromptTokens: resp.PromptEvalCount,
-		CompTokens:   resp.EvalCount,
-		ToolCalls:    resp.ToolCallCount,
+		Content:      resp.Choices[0].Message.Content,
+		PromptTokens: resp.Usage.PromptTokens,
+		CompTokens:   resp.Usage.CompletionTokens,
+		ToolCalls:    resp.Usage.ToolCallCount,
 		Model:        gathererModel,
 	}, nil
 }

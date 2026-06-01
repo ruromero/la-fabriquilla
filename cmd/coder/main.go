@@ -9,8 +9,8 @@ import (
 	"github.com/ruromero/la-fabriquilla/agents"
 	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
 	"github.com/ruromero/la-fabriquilla/harness"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/mcp"
-	"github.com/ruromero/la-fabriquilla/ollama"
 	"github.com/ruromero/la-fabriquilla/pipeline"
 	"github.com/ruromero/la-fabriquilla/traces"
 )
@@ -18,7 +18,7 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	ol := ollama.NewClient(cfg.OllamaURL)
+	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
 	ctx := context.Background()
 
 	var sess *harness.SerenaSession
@@ -44,7 +44,7 @@ func main() {
 	gatherTools, gatherHandler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
-	codeResult, err := agents.CodeWithUsage(ctx, ol, state.Design, state.ResearchContext, state.Conventions, coderTools, coderHandler)
+	codeResult, err := agents.CodeWithUsage(ctx, cl, state.Design, state.ResearchContext, state.Conventions, coderTools, coderHandler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("code phase failed", "error", err)
@@ -69,7 +69,7 @@ func main() {
 	code := codeResult.Content
 
 	start = time.Now()
-	review, err := agents.Review(ctx, ol, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
+	review, err := agents.Review(ctx, cl, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
 	elapsed = time.Since(start)
 	if err != nil {
 		slog.Error("review phase failed", "error", err)
@@ -96,7 +96,7 @@ func main() {
 		feedback := pipeline.FormatReviewFeedback(review.Correctness, review.Security, review.Intent)
 
 		start = time.Now()
-		iterResult, err := agents.IterateWithUsage(ctx, ol, code, feedback, coderTools, coderHandler)
+		iterResult, err := agents.IterateWithUsage(ctx, cl, code, feedback, coderTools, coderHandler)
 		elapsed = time.Since(start)
 		if err != nil {
 			slog.Error("iterate phase failed", "iteration", i+1, "error", err)
@@ -120,7 +120,7 @@ func main() {
 		})
 
 		start = time.Now()
-		review, err = agents.Review(ctx, ol, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
+		review, err = agents.Review(ctx, cl, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
 		elapsed = time.Since(start)
 		if err != nil {
 			slog.Error("review phase failed", "iteration", i+1, "error", err)

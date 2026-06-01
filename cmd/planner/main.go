@@ -8,7 +8,7 @@ import (
 
 	"github.com/ruromero/la-fabriquilla/agents"
 	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
-	"github.com/ruromero/la-fabriquilla/openai"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/traces"
 )
 
@@ -20,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := openai.NewClient(cfg.Planner.BaseURL, cfg.Planner.APIKey)
+	client := inference.NewClient(cfg.Planner.BaseURL, inference.WithAPIKey(cfg.Planner.APIKey))
 	ctx := context.Background()
 
 	start := time.Now()

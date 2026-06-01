@@ -2,8 +2,8 @@ package harness
 
 import (
 	"github.com/ruromero/la-fabriquilla/github"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/mcp"
-	"github.com/ruromero/la-fabriquilla/ollama"
 )
 
 var SerenaGatherAllowed = map[string]bool{
@@ -30,7 +30,7 @@ var SerenaCoderAllowed = map[string]bool{
 	"replace_content":                true,
 }
 
-func BuildGatherTools(rc *RepoContext, gh *github.Client, serena *mcp.Client) ([]ollama.Tool, ollama.ToolHandler) {
+func BuildGatherTools(rc *RepoContext, gh *github.Client, serena *mcp.Client) ([]inference.Tool, inference.ToolHandler) {
 	contextHandler := NewContextToolHandler(rc, gh)
 	contextTools := ContextTools()
 
@@ -48,7 +48,7 @@ func BuildGatherTools(rc *RepoContext, gh *github.Client, serena *mcp.Client) ([
 	return allTools, composite
 }
 
-func BuildCoderTools(serena *mcp.Client) ([]ollama.Tool, ollama.ToolHandler) {
+func BuildCoderTools(serena *mcp.Client) ([]inference.Tool, inference.ToolHandler) {
 	if serena == nil {
 		return nil, nil
 	}

@@ -6,19 +6,19 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/sandbox"
 )
 
 type CompositeToolHandler struct {
-	routes map[string]ollama.ToolHandler
+	routes map[string]inference.ToolHandler
 }
 
 func NewCompositeToolHandler() *CompositeToolHandler {
-	return &CompositeToolHandler{routes: make(map[string]ollama.ToolHandler)}
+	return &CompositeToolHandler{routes: make(map[string]inference.ToolHandler)}
 }
 
-func (c *CompositeToolHandler) Register(tools []ollama.Tool, handler ollama.ToolHandler) {
+func (c *CompositeToolHandler) Register(tools []inference.Tool, handler inference.ToolHandler) {
 	for _, t := range tools {
 		c.routes[t.Function.Name] = handler
 	}
@@ -54,8 +54,8 @@ func logRedactionEvents(source, tool string, events []sandbox.RedactionEvent) {
 	)
 }
 
-func FilterTools(tools []ollama.Tool, allowed map[string]bool) []ollama.Tool {
-	var filtered []ollama.Tool
+func FilterTools(tools []inference.Tool, allowed map[string]bool) []inference.Tool {
+	var filtered []inference.Tool
 	for _, t := range tools {
 		if allowed[t.Function.Name] {
 			filtered = append(filtered, t)
