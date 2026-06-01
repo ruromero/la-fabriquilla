@@ -364,6 +364,57 @@ func TestResponseFormatMarshal(t *testing.T) {
 	})
 }
 
+func TestChatEmptyChoicesReturnsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ChatResponse{
+			Usage: Usage{PromptTokens: 10, CompletionTokens: 5},
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	_, err := c.Chat(context.Background(), ChatRequest{
+		Model:    "test-model",
+		Messages: []Message{{Role: "user", Content: "hi"}},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty choices")
+	}
+}
+
+func TestNewClientTrimsTrailingSlash(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Errorf("path = %q, want /chat/completions", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ChatResponse{
+			Choices: []Choice{{Message: Message{Role: "assistant", Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL+"/", WithAPIKey("k"))
+	_, err := c.Chat(context.Background(), ChatRequest{
+		Model:    "m",
+		Messages: []Message{{Role: "user", Content: "hi"}},
+	})
+	if err != nil {
+		t.Fatalf("Chat with trailing slash: %v", err)
+	}
+}
+
+func TestArgKeysOmitsValues(t *testing.T) {
+	got := argKeys(map[string]any{
+		"path":    "/etc/passwd",
+		"content": "secret-value",
+	})
+	if got != "content,path" {
+		t.Errorf("argKeys = %q, want %q", got, "content,path")
+	}
+}
+
 func TestParseArguments(t *testing.T) {
 	args, err := parseArguments(`{"key":"value","num":42}`)
 	if err != nil {

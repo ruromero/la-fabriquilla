@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
+	"strings"
 )
 
 type Client struct {
@@ -24,7 +26,7 @@ func WithAPIKey(key string) Option {
 
 func NewClient(baseURL string, opts ...Option) *Client {
 	c := &Client{
-		baseURL: baseURL,
+		baseURL: strings.TrimRight(baseURL, "/"),
 		http:    &http.Client{},
 	}
 	for _, o := range opts {
@@ -146,6 +148,9 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
 		return ChatResponse{}, fmt.Errorf("decode response: %w", err)
 	}
+	if len(chatResp.Choices) == 0 {
+		return chatResp, fmt.Errorf("inference api: empty choices in response")
+	}
 	return chatResp, nil
 }
 
@@ -167,13 +172,6 @@ func (c *Client) ChatWithTools(ctx context.Context, req ChatRequest, handler Too
 		totalPrompt += resp.Usage.PromptTokens
 		totalComp += resp.Usage.CompletionTokens
 		lastResp = resp
-
-		if len(resp.Choices) == 0 {
-			resp.Usage.PromptTokens = totalPrompt
-			resp.Usage.CompletionTokens = totalComp
-			resp.Usage.ToolCallCount = totalToolCalls
-			return resp, nil
-		}
 
 		msg := resp.Choices[0].Message
 		if len(msg.ToolCalls) == 0 {
@@ -198,7 +196,7 @@ func (c *Client) ChatWithTools(ctx context.Context, req ChatRequest, handler Too
 				continue
 			}
 
-			slog.Info("tool call", "tool", tc.Function.Name, "args", args)
+			slog.Info("tool call", "tool", tc.Function.Name, "arg_keys", argKeys(args))
 			result, execErr := handler.Execute(ctx, tc.Function.Name, args)
 			if execErr != nil {
 				slog.Warn("tool call failed", "tool", tc.Function.Name, "error", execErr)
@@ -234,10 +232,16 @@ func (c *Client) SimpleChat(ctx context.Context, model, system, user string) (st
 	if err != nil {
 		return "", Usage{}, err
 	}
-	if len(resp.Choices) == 0 {
-		return "", Usage{}, fmt.Errorf("empty response")
-	}
 	return resp.Choices[0].Message.Content, resp.Usage, nil
+}
+
+func argKeys(args map[string]any) string {
+	keys := make([]string, 0, len(args))
+	for k := range args {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
 }
 
 func parseArguments(raw string) (map[string]any, error) {

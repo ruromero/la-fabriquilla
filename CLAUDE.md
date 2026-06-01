@@ -53,6 +53,7 @@ CGO_ENABLED=0 go build ./...
 ## Security invariants
 
 - Credentials never enter agent prompts or LLM context
+- Credentials and tool argument values never appear in log output
 - No agent output can modify agent configuration or prompts
 - All untrusted input is sanitized before entering agent context
 - Review must use a different model family than code generation
