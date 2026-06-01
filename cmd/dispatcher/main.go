@@ -342,7 +342,15 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 		}
 
 		if state.PRNumber > 0 {
-			log.Info("PR created", "pr", state.PRNumber)
+			log.Info("PR created, starting review loop", "pr", state.PRNumber)
+			runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
+				return runPhase(ctx, cfg, binary, statePath, issueNumber, sandboxImage)
+			}
+			if err := reviewIterateLoop(ctx, &cfg, store, key, statePath, sandboxImage, issue.Number, runner); err != nil {
+				log.Warn("review-iterate loop failed", "error", err)
+				comment := fmt.Sprintf("## Factory: Review Loop Failed\n\nThe automated review-iterate loop failed after creating PR #%d.\n\n```\n%s\n```\n\nPlease review the PR manually.", state.PRNumber, err)
+				gh.CreateComment(ctx, issue.Number, comment)
+			}
 		}
 		return nil
 	}
@@ -354,12 +362,14 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 // have non-idempotent side effects (creating branches, PRs).
 var noRetryPhases = map[string]bool{
 	"committer": true,
+	"iterator":  true,
 }
 
 // sandboxMVPPhases lists phases enabled for sandbox execution in the MVP.
 // Expand this set as sandbox images and policies are validated per phase.
 var sandboxMVPPhases = map[string]bool{
-	"coder": true,
+	"coder":    true,
+	"iterator": true,
 }
 
 const maxBackoff = 2 * time.Minute
@@ -556,4 +566,45 @@ func createSubIssues(ctx context.Context, gh *github.Client, parentNumber int, d
 	}
 
 	return gh.CreateComment(ctx, parentNumber, checklist.String())
+}
+
+type phaseRunner func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error
+
+func reviewIterateLoop(ctx context.Context, cfg *config.Config, store *pipeline.FileStateStore, key, statePath, sandboxImage string, issueNumber int, runner phaseRunner) error {
+	for i := 0; i < cfg.MaxIterations; i++ {
+		slog.Info("starting review iteration", "iteration", i+1, "max", cfg.MaxIterations)
+
+		if err := runner(ctx, cfg, "reviewer", statePath, issueNumber, sandboxImage); err != nil {
+			return fmt.Errorf("reviewer (iteration %d): %w", i+1, err)
+		}
+
+		state, err := store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after review (iteration %d): %w", i+1, err)
+		}
+		if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after review (iteration %d): %w", i+1, err)
+		}
+
+		if state.Review == nil || !pipeline.ReviewNeedsIteration(state.Review.Correctness, state.Review.Security, state.Review.Intent) {
+			slog.Info("review clean", "iterations", i+1)
+			return nil
+		}
+
+		slog.Info("review found issues, running iterator", "iteration", i+1)
+		if err := runner(ctx, cfg, "iterator", statePath, issueNumber, sandboxImage); err != nil {
+			return fmt.Errorf("iterator (iteration %d): %w", i+1, err)
+		}
+
+		state, err = store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after iterate (iteration %d): %w", i+1, err)
+		}
+		if err := pipeline.CheckCostBudget(state, cfg.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after iterate (iteration %d): %w", i+1, err)
+		}
+	}
+
+	slog.Warn("max review iterations reached", "max", cfg.MaxIterations)
+	return nil
 }
