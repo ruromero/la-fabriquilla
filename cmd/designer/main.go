@@ -8,18 +8,18 @@ import (
 
 	"github.com/ruromero/la-fabriquilla/agents"
 	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/traces"
 )
 
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	ol := ollama.NewClient(cfg.OllamaURL)
+	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
 	ctx := context.Background()
 
 	start := time.Now()
-	result, err := agents.DesignWithUsage(ctx, ol, state.PlanContent, state.ResearchContext, state.Conventions)
+	result, err := agents.DesignWithUsage(ctx, cl, state.PlanContent, state.ResearchContext, state.Conventions)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("design phase failed", "error", err)

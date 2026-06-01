@@ -9,15 +9,15 @@ import (
 	"github.com/ruromero/la-fabriquilla/agents"
 	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
 	"github.com/ruromero/la-fabriquilla/harness"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/mcp"
-	"github.com/ruromero/la-fabriquilla/ollama"
 	"github.com/ruromero/la-fabriquilla/traces"
 )
 
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	ol := ollama.NewClient(cfg.OllamaURL)
+	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
 	gh := helpers.MustGitHubClientForApp(cfg, "worker", state)
 
 	ctx := context.Background()
@@ -43,7 +43,7 @@ func main() {
 	tools, handler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
-	result, err := agents.GatherContextWithUsage(ctx, ol, state.IssueTitle, state.IssueBody, state.Summaries, tools, handler)
+	result, err := agents.GatherContextWithUsage(ctx, cl, state.IssueTitle, state.IssueBody, state.Summaries, tools, handler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("gather context failed", "error", err)

@@ -3,4 +3,4 @@ network:
   allow:
     - endpoint: "ollama.ai.svc.cluster.local:11434"
       methods: [POST]
-      paths: ["/api/chat"]
+      paths: ["/v1/chat/completions"]

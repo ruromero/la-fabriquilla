@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/pipeline"
 )
 
@@ -43,13 +43,13 @@ type CodeResult struct {
 	Model        string
 }
 
-func Code(ctx context.Context, ol *ollama.Client, design, researchContext, conventions string, tools []ollama.Tool, handler ollama.ToolHandler) (string, error) {
-	r, err := CodeWithUsage(ctx, ol, design, researchContext, conventions, tools, handler)
+func Code(ctx context.Context, cl *inference.Client, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
+	r, err := CodeWithUsage(ctx, cl, design, researchContext, conventions, tools, handler)
 	return r.Content, err
 }
 
 // CodeWithUsage works like Code but also returns token usage.
-func CodeWithUsage(ctx context.Context, ol *ollama.Client, design, researchContext, conventions string, tools []ollama.Tool, handler ollama.ToolHandler) (CodeResult, error) {
+func CodeWithUsage(ctx context.Context, cl *inference.Client, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (CodeResult, error) {
 	userPrompt := fmt.Sprintf("## Technical Design\n\n%s", design)
 	if conventions != "" {
 		userPrompt += fmt.Sprintf("\n\n## Project Conventions\n\nFollow these conventions strictly:\n\n%s", conventions)
@@ -58,36 +58,37 @@ func CodeWithUsage(ctx context.Context, ol *ollama.Client, design, researchConte
 		userPrompt += fmt.Sprintf("\n\n## Research Context\n\n%s", researchContext)
 	}
 
-	req := ollama.ChatRequest{
+	temp := float64(0)
+	req := inference.ChatRequest{
 		Model: coderModel,
-		Messages: []ollama.Message{
+		Messages: []inference.Message{
 			{Role: "system", Content: coderSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Tools:   tools,
-		Options: &ollama.Options{Temperature: 0},
+		Tools:       tools,
+		Temperature: &temp,
 	}
 
-	var resp ollama.ChatResponse
+	var resp inference.ChatResponse
 	var err error
 	if len(tools) > 0 && handler != nil {
-		resp, err = ol.ChatWithTools(ctx, req, handler, 20)
+		resp, err = cl.ChatWithTools(ctx, req, handler, 20)
 		if err != nil {
 			return CodeResult{}, fmt.Errorf("coder chat with tools: %w", err)
 		}
 	} else {
-		req.Format = pipeline.GetCoderOutputSchema()
-		resp, err = ol.Chat(ctx, req)
+		req.ResponseFormat = inference.StructuredOutput(pipeline.GetCoderOutputSchema())
+		resp, err = cl.Chat(ctx, req)
 		if err != nil {
 			return CodeResult{}, fmt.Errorf("coder chat: %w", err)
 		}
 	}
 
 	return CodeResult{
-		Content:      resp.Message.Content,
-		PromptTokens: resp.PromptEvalCount,
-		CompTokens:   resp.EvalCount,
-		ToolCalls:    resp.ToolCallCount,
+		Content:      resp.Choices[0].Message.Content,
+		PromptTokens: resp.Usage.PromptTokens,
+		CompTokens:   resp.Usage.CompletionTokens,
+		ToolCalls:    resp.Usage.ToolCallCount,
 		Model:        coderModel,
 	}, nil
 }

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 type mockToolHandler struct {
@@ -23,8 +23,8 @@ func TestCompositeRedactsSecrets(t *testing.T) {
 	mock := &mockToolHandler{result: "token is " + secret}
 
 	c := NewCompositeToolHandler()
-	c.Register([]ollama.Tool{
-		{Type: "function", Function: ollama.ToolDef{Name: "read_file"}},
+	c.Register([]inference.Tool{
+		{Type: "function", Function: inference.ToolDef{Name: "read_file"}},
 	}, mock)
 
 	got, err := c.Execute(context.Background(), "read_file", nil)
@@ -44,8 +44,8 @@ func TestCompositeRedactsErrors(t *testing.T) {
 	mock := &mockToolHandler{err: fmt.Errorf("auth failed with token %s", secret)}
 
 	c := NewCompositeToolHandler()
-	c.Register([]ollama.Tool{
-		{Type: "function", Function: ollama.ToolDef{Name: "read_file"}},
+	c.Register([]inference.Tool{
+		{Type: "function", Function: inference.ToolDef{Name: "read_file"}},
 	}, mock)
 
 	_, err := c.Execute(context.Background(), "read_file", nil)
@@ -76,8 +76,8 @@ func TestCompositeCleanResult(t *testing.T) {
 	mock := &mockToolHandler{result: clean}
 
 	c := NewCompositeToolHandler()
-	c.Register([]ollama.Tool{
-		{Type: "function", Function: ollama.ToolDef{Name: "read_file"}},
+	c.Register([]inference.Tool{
+		{Type: "function", Function: inference.ToolDef{Name: "read_file"}},
 	}, mock)
 
 	got, err := c.Execute(context.Background(), "read_file", nil)

@@ -7,8 +7,13 @@ import (
 	"time"
 )
 
+type InferenceConfig struct {
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key,omitempty"`
+}
+
 type Config struct {
-	OllamaURL        string               `json:"ollama_url"`
+	Inference        InferenceConfig      `json:"inference"`
 	GeminiAPIKey     string               `json:"gemini_api_key,omitempty"`
 	Planner          PlannerConfig        `json:"planner"`
 	PollInterval     Duration             `json:"poll_interval"`
@@ -120,7 +125,7 @@ func LoadConfig(path string) (Config, error) {
 	}
 
 	cfg := Config{
-		OllamaURL:        "http://ollama.ai.svc.cluster.local:11434",
+		Inference:        InferenceConfig{BaseURL: "http://ollama.ai.svc.cluster.local:11434/v1"},
 		PollInterval:     Duration{30 * time.Second},
 		MaxIterations:    3,
 		MaxCostBudget:    100000,
@@ -146,6 +151,10 @@ func LoadConfig(path string) (Config, error) {
 
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse config: %w", err)
+	}
+
+	if v := os.Getenv("INFERENCE_API_KEY"); v != "" {
+		cfg.Inference.APIKey = v
 	}
 
 	if v := os.Getenv("GEMINI_API_KEY"); v != "" {

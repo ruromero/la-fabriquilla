@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/ruromero/la-fabriquilla/github"
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 type ContextToolHandler struct {
@@ -79,11 +79,11 @@ func (h *ContextToolHandler) listFiles(ctx context.Context, path string) (string
 	return strings.TrimSpace(b.String()), nil
 }
 
-func ContextTools() []ollama.Tool {
-	return []ollama.Tool{
+func ContextTools() []inference.Tool {
+	return []inference.Tool{
 		{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        "list_documents",
 				Description: "List available project documentation files (README.md, ARCHITECTURE.md, CONVENTIONS.md)",
 				Parameters: map[string]any{
@@ -94,7 +94,7 @@ func ContextTools() []ollama.Tool {
 		},
 		{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        "list_sections",
 				Description: "List section names within a documentation file",
 				Parameters: map[string]any{
@@ -111,7 +111,7 @@ func ContextTools() []ollama.Tool {
 		},
 		{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        "get_section",
 				Description: "Get the content of a specific section from a documentation file",
 				Parameters: map[string]any{
@@ -132,7 +132,7 @@ func ContextTools() []ollama.Tool {
 		},
 		{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        "get_document",
 				Description: "Get the full content of a documentation file. Prefer get_section for targeted reads.",
 				Parameters: map[string]any{
@@ -149,7 +149,7 @@ func ContextTools() []ollama.Tool {
 		},
 		{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        "list_files",
 				Description: "List files and directories at a path in the repository",
 				Parameters: map[string]any{
@@ -166,7 +166,7 @@ func ContextTools() []ollama.Tool {
 		},
 		{
 			Type: "function",
-			Function: ollama.ToolDef{
+			Function: inference.ToolDef{
 				Name:        "read_file",
 				Description: "Read the content of a source file from the repository",
 				Parameters: map[string]any{

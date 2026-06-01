@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/ollama"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 const reviewerModel = "qwen3:14b"
@@ -68,7 +68,7 @@ type ReviewResult struct {
 	Model        string
 }
 
-func Review(ctx context.Context, ol *ollama.Client, code, design, plan, conventions string, tools []ollama.Tool, handler ollama.ToolHandler) (ReviewResult, error) {
+func Review(ctx context.Context, cl *inference.Client, code, design, plan, conventions string, tools []inference.Tool, handler inference.ToolHandler) (ReviewResult, error) {
 	codeContext := fmt.Sprintf("## Plan\n\n%s\n\n## Design\n\n%s\n\n## Code\n\n%s", plan, design, code)
 	if conventions != "" {
 		codeContext += fmt.Sprintf("\n\n## Project Conventions\n\nVerify code follows these conventions:\n\n%s", conventions)
@@ -77,7 +77,7 @@ func Review(ctx context.Context, ol *ollama.Client, code, design, plan, conventi
 	var totalPrompt, totalComp, totalTools int
 	var prompt, comp, tc int
 
-	correctness, prompt, comp, tc, err := reviewWith(ctx, ol, correctnessPrompt, codeContext, tools, handler)
+	correctness, prompt, comp, tc, err := reviewWith(ctx, cl, correctnessPrompt, codeContext, tools, handler)
 	if err != nil {
 		return ReviewResult{}, fmt.Errorf("correctness review: %w", err)
 	}
@@ -86,7 +86,7 @@ func Review(ctx context.Context, ol *ollama.Client, code, design, plan, conventi
 	totalTools += tc
 
 	var security, intent string
-	security, prompt, comp, tc, err = reviewWith(ctx, ol, securityPrompt, codeContext, tools, handler)
+	security, prompt, comp, tc, err = reviewWith(ctx, cl, securityPrompt, codeContext, tools, handler)
 	if err != nil {
 		return ReviewResult{}, fmt.Errorf("security review: %w", err)
 	}
@@ -94,7 +94,7 @@ func Review(ctx context.Context, ol *ollama.Client, code, design, plan, conventi
 	totalComp += comp
 	totalTools += tc
 
-	intent, prompt, comp, tc, err = reviewWith(ctx, ol, intentPrompt, codeContext, nil, nil)
+	intent, prompt, comp, tc, err = reviewWith(ctx, cl, intentPrompt, codeContext, nil, nil)
 	if err != nil {
 		return ReviewResult{}, fmt.Errorf("intent review: %w", err)
 	}
@@ -113,28 +113,29 @@ func Review(ctx context.Context, ol *ollama.Client, code, design, plan, conventi
 	}, nil
 }
 
-func reviewWith(ctx context.Context, ol *ollama.Client, systemPrompt, userContent string, tools []ollama.Tool, handler ollama.ToolHandler) (string, int, int, int, error) {
-	req := ollama.ChatRequest{
+func reviewWith(ctx context.Context, cl *inference.Client, systemPrompt, userContent string, tools []inference.Tool, handler inference.ToolHandler) (string, int, int, int, error) {
+	temp := float64(0)
+	req := inference.ChatRequest{
 		Model: reviewerModel,
-		Messages: []ollama.Message{
+		Messages: []inference.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userContent},
 		},
-		Tools:   tools,
-		Options: &ollama.Options{Temperature: 0},
+		Tools:       tools,
+		Temperature: &temp,
 	}
 
 	if len(tools) > 0 && handler != nil {
-		resp, err := ol.ChatWithTools(ctx, req, handler, 10)
+		resp, err := cl.ChatWithTools(ctx, req, handler, 10)
 		if err != nil {
 			return "", 0, 0, 0, err
 		}
-		return resp.Message.Content, resp.PromptEvalCount, resp.EvalCount, resp.ToolCallCount, nil
+		return resp.Choices[0].Message.Content, resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.ToolCallCount, nil
 	}
 
-	resp, err := ol.Chat(ctx, req)
+	resp, err := cl.Chat(ctx, req)
 	if err != nil {
 		return "", 0, 0, 0, err
 	}
-	return resp.Message.Content, resp.PromptEvalCount, resp.EvalCount, 0, nil
+	return resp.Choices[0].Message.Content, resp.Usage.PromptTokens, resp.Usage.CompletionTokens, 0, nil
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/openai"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
 
 const plannerSystemPrompt = `You are a software project planner. You are given a GitHub issue along with relevant project context that was gathered specifically for this issue.
@@ -46,7 +46,7 @@ type PlanResult struct {
 	Model        string
 }
 
-func Plan(ctx context.Context, client *openai.Client, model, issueTitle, issueBody, researchContext, gatheredContext, conventions, commentHistory string) (PlanResult, error) {
+func Plan(ctx context.Context, client *inference.Client, model, issueTitle, issueBody, researchContext, gatheredContext, conventions, commentHistory string) (PlanResult, error) {
 	if client == nil {
 		return PlanResult{}, fmt.Errorf("planner requires an API client (configure planner in config.json and set PLANNER_API_KEY)")
 	}
@@ -65,7 +65,7 @@ func Plan(ctx context.Context, client *openai.Client, model, issueTitle, issueBo
 		userPrompt += fmt.Sprintf("\n\n## Research Context\n\n%s", researchContext)
 	}
 
-	content, usage, err := client.ChatWithUsage(ctx, model, plannerSystemPrompt, userPrompt)
+	content, usage, err := client.SimpleChat(ctx, model, plannerSystemPrompt, userPrompt)
 	if err != nil {
 		return PlanResult{}, fmt.Errorf("planner: %w", err)
 	}

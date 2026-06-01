@@ -1,5 +1,7 @@
 {
-  "ollama_url": "http://ollama.ai.svc.cluster.local:11434",
+  "inference": {
+    "base_url": "http://ollama.ai.svc.cluster.local:11434/v1"
+  },
   "poll_interval": "30s",
   "max_iterations": 3,
   "max_cost_budget": 100000,

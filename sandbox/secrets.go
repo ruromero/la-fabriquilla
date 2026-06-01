@@ -31,7 +31,7 @@ var sensitivePatterns = []SensitivePattern{
 	{"hostname pattern", regexp.MustCompile(`(?i)\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:internal|local|lan|home|corp|intranet)\b`)},
 	{"AWS access key", regexp.MustCompile(`AKIA[0-9A-Z]{16}`)},
 	{"GitHub token", regexp.MustCompile(`ghp_[A-Za-z0-9]{36}`)},
-	{"generic secret env", regexp.MustCompile(`(?i)(GITHUB_TOKEN|GEMINI_API_KEY|PLANNER_API_KEY|DEEPSEEK_API_KEY)\s*=\s*[^\s$]{8,}`)},
+	{"generic secret env", regexp.MustCompile(`(?i)(GITHUB_TOKEN|GEMINI_API_KEY|PLANNER_API_KEY|DEEPSEEK_API_KEY|INFERENCE_API_KEY)\s*=\s*[^\s$]{8,}`)},
 }
 
 // pemBlock matches an entire PEM private key block (header through footer).
