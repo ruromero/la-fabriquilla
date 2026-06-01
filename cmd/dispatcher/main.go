@@ -348,6 +348,8 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, iss
 			}
 			if err := reviewIterateLoop(ctx, &cfg, store, key, statePath, sandboxImage, issue.Number, runner); err != nil {
 				log.Warn("review-iterate loop failed", "error", err)
+				comment := fmt.Sprintf("## Factory: Review Loop Failed\n\nThe automated review-iterate loop failed after creating PR #%d.\n\n```\n%s\n```\n\nPlease review the PR manually.", state.PRNumber, err)
+				gh.CreateComment(ctx, issue.Number, comment)
 			}
 		}
 		return nil

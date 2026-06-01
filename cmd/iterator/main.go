@@ -76,6 +76,24 @@ func main() {
 		parsed = pipeline.ParseCodeOutput(iterResult.Content)
 	}
 
+	if len(parsed) == 0 {
+		slog.Error("no files parsed from iterator output")
+		os.Exit(1)
+	}
+
+	if err := pipeline.ValidateFiles(parsed, cfg.BlockedPaths); err != nil {
+		slog.Error("iterator output failed path validation", "error", err)
+		os.Exit(1)
+	}
+	if violations := pipeline.ValidateContents(parsed); len(violations) > 0 {
+		slog.Error("secret detected in iterator output", "pattern", violations[0].Pattern, "file", violations[0].File, "line", violations[0].Line)
+		os.Exit(1)
+	}
+	if err := pipeline.CheckPRScope(parsed, cfg.MaxFilesChanged, cfg.MaxPRSizeLines); err != nil {
+		slog.Error("iterator output failed scope check", "error", err)
+		os.Exit(1)
+	}
+
 	if state.PRBranch != "" {
 		gh := helpers.MustGitHubClientForApp(cfg, "committer", state)
 		files := make([]github.FileChange, len(parsed))
