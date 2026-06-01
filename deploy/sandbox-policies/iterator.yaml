@@ -5,5 +5,5 @@ network:
       methods: [POST]
       paths: ["/v1/chat/completions"]
     - endpoint: "api.github.com:443"
-      methods: [POST, PUT, GET]
+      methods: [GET, POST, PATCH]
       paths: ["/repos/"]

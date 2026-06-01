@@ -369,7 +369,6 @@ var noRetryPhases = map[string]bool{
 // Expand this set as sandbox images and policies are validated per phase.
 var sandboxMVPPhases = map[string]bool{
 	"coder":    true,
-	"reviewer": true,
 	"iterator": true,
 }
 
