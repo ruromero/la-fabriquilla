@@ -44,6 +44,7 @@ CGO_ENABLED=0 go build ./...
 - github/ — GitHub API client (issues, PRs, comments, labels)
 - inference/ — OpenAI-compatible inference client (chat + tool-calling loop)
 - gemini/ — Gemini API client (research phase)
+- review/ — unified review finding types, external review adapter interface, QodoAdapter
 - mcp/ — MCP client (JSON-RPC over stdio, tool discovery)
 - sandbox/ — input sanitization (Unicode normalization)
 - harness/ — phase context assembly
