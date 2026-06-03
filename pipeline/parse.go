@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 // coderOutputSchema is the JSON Schema for structured coder output.
@@ -94,12 +96,33 @@ func ParseCodeOutput(output string) []FileState {
 	return files
 }
 
-func ReviewNeedsIteration(correctness, security, intent string) bool {
-	combined := correctness + security + intent
-	return strings.Contains(combined, "[CRITICAL]") || strings.Contains(combined, "[MEDIUM]")
+func ReviewNeedsIteration(findings []review.ReviewFinding) bool {
+	for _, f := range findings {
+		if f.Severity == review.SeverityCritical || f.Severity == review.SeverityMedium {
+			return true
+		}
+	}
+	return false
 }
 
-func FormatReviewFeedback(correctness, security, intent string) string {
-	return fmt.Sprintf("## Correctness Review\n\n%s\n\n## Security Review\n\n%s\n\n## Intent Review\n\n%s",
-		correctness, security, intent)
+func FormatReviewFeedback(findings []review.ReviewFinding) string {
+	if len(findings) == 0 {
+		return "[PASS] No issues found."
+	}
+	var b strings.Builder
+	for _, f := range findings {
+		tag := strings.ToUpper(string(f.Severity))
+		fmt.Fprintf(&b, "[%s] %s", tag, f.Title)
+		if f.Detail != "" {
+			fmt.Fprintf(&b, " — %s", f.Detail)
+		}
+		if f.File != "" {
+			fmt.Fprintf(&b, ", %s", f.File)
+			if f.Line > 0 {
+				fmt.Fprintf(&b, ":%d", f.Line)
+			}
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }

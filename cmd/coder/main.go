@@ -91,9 +91,9 @@ func main() {
 		CumCostUSD:      state.TotalCostUSD,
 	})
 
-	for i := 0; i < cfg.MaxIterations && pipeline.ReviewNeedsIteration(review.Correctness, review.Security, review.Intent); i++ {
+	for i := 0; i < cfg.MaxIterations && pipeline.ReviewNeedsIteration(review.Findings); i++ {
 		slog.Info("starting iteration", "iteration", i+1, "max", cfg.MaxIterations)
-		feedback := pipeline.FormatReviewFeedback(review.Correctness, review.Security, review.Intent)
+		feedback := pipeline.FormatReviewFeedback(review.Findings)
 
 		start = time.Now()
 		iterResult, err := agents.IterateWithUsage(ctx, cl, code, feedback, coderTools, coderHandler)
@@ -151,9 +151,7 @@ func main() {
 
 	state.Code = code
 	state.Review = &pipeline.ReviewState{
-		Correctness: review.Correctness,
-		Security:    review.Security,
-		Intent:      review.Intent,
+		Findings: review.Findings,
 	}
 	state.Files = parsed
 	state.Phase = "code-done"

@@ -45,7 +45,7 @@ func main() {
 		slog.Error("no review findings in state")
 		os.Exit(1)
 	}
-	feedback := pipeline.FormatReviewFeedback(state.Review.Correctness, state.Review.Security, state.Review.Intent)
+	feedback := pipeline.FormatReviewFeedback(state.Review.Findings)
 
 	start := time.Now()
 	iterResult, err := agents.IterateWithUsage(ctx, cl, state.Code, feedback, tools, handler)
