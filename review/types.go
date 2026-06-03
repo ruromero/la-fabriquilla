@@ -45,6 +45,10 @@ type PRComment struct {
 
 type PRCommentClient interface {
 	CreateComment(ctx context.Context, issueNumber int, body string) error
+	// ListPRComments returns issue-level comments (GET /repos/{owner}/{repo}/issues/{number}/comments).
+	// Qodo posts its summary comment here.
 	ListPRComments(ctx context.Context, prNumber int) ([]PRComment, error)
+	// ListPRReviewComments returns pull-request review comments attached to diff lines
+	// (GET /repos/{owner}/{repo}/pulls/{number}/comments). Qodo posts inline findings here.
 	ListPRReviewComments(ctx context.Context, prNumber int) ([]PRComment, error)
 }

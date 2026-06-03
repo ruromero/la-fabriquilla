@@ -1,5 +1,5 @@
 [github_app]
-pr_commands = ["/review"]
+pr_commands = ["/agentic_review"]
 
 [pr_reviewer]
 enable_review_labels_effort = true
