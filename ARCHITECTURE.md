@@ -699,3 +699,81 @@ These sections from the original v2 design are not yet in the codebase:
    labels, status checks. No side channels, no agent-to-agent API.
 7. **Review is harder than generation.** The arbiter role uses a stronger
    model than the generation roles.
+
+---
+
+## Roadmap
+
+Migration from monolithic factory-orchestrator to multi-app sandboxed
+architecture with scoped GitHub App identities, OpenShell sandboxing,
+pluggable review, self-improvement feedback loop, comprehensive guardrails,
+and budget control.
+
+### v2.1 — Budget & Resilience
+
+Foundation for autonomous operation within cost bounds.
+
+- #27 — Extract shared packages
+- #28 — Split into separate binaries
+- #30 — Pipeline state serialization
+- #50 — Instrument API clients for token counting
+- #51 — Retry with backoff + stall detection
+- #52 — Structured output for coder phase
+- #36 — Guardrails in dispatcher and committer (depends on #50)
+
+### v2.2 — Sandboxed Execution
+
+Defense in depth for LLM-driven phases.
+
+- #29 — Three GitHub Apps
+- #34 — OpenShell sandbox integration (coder-first MVP)
+- #35 — Sandbox images (go + rust + typescript, depends on #34)
+- #53 — MCP credential redaction
+- #54 — SSRF protection for URL-capable tools
+
+### v2.3 — Review & Verification
+
+Pluggable multi-model review pipeline.
+
+- #31 — Review adapter interface + QodoAdapter
+- #32 — Arbiter phase / DeepSeek (depends on #31)
+- #33 — Feedback binary with structured logging (depends on #32)
+- #39 — Human review adapter + merge automation (depends on #31, #33)
+
+### v2.4 — Observability & Feedback Loop
+
+Persistent history, monitoring, self-improvement.
+
+- #37 — Golden-set evaluation harness
+- #55 — Persistent run history with SQLite (depends on #50)
+- #56 — Context7 as second MCP server
+- #38 — Post-merge monitoring + auto-revert (depends on #33)
+- #40 — Dashboard: config, monitoring, reports (depends on #33, #55)
+
+### Dependency graph
+
+```
+v2.1 Budget & Resilience          v2.2 Sandboxed Execution
+─────────────────────────         ─────────────────────────
+#50 token counting ──┐            #34 OpenShell (coder MVP)
+#51 retry + stall    │              └── #35 sandbox images
+#52 structured output│            #53 MCP credential redact
+                     │            #54 SSRF protection
+#36 guardrails ◄─────┘
+        │
+        ▼
+v2.3 Review & Verification       v2.4 Observability & Feedback
+──────────────────────────        ─────────────────────────────
+#31 review adapter                #55 SQLite history ◄── #50
+  └── #32 arbiter                 #56 Context7 MCP
+        └── #33 feedback ────┐    #38 post-merge ◄────── #33
+              └── #39 human  │    #40 dashboard ◄──────── #33, #55
+                             │
+                             └──►
+```
+
+### Execution strategy
+
+- **v2.1 and v2.2 run in parallel** — both are high priority (budget + security)
+- **v2.3 starts when** #36 guardrails land (review loop limits need guardrails)
+- **v2.4 starts when** #33 feedback binary lands (post-merge monitoring and dashboard need it)
