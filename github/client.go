@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"time"
 )
 
 type TokenSource interface {
@@ -40,9 +41,10 @@ type Label struct {
 }
 
 type Comment struct {
-	ID   int    `json:"id"`
-	Body string `json:"body"`
-	User struct {
+	ID        int       `json:"id"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+	User      struct {
 		Login string `json:"login"`
 	} `json:"user"`
 }
@@ -162,6 +164,15 @@ func (c *Client) ListComments(ctx context.Context, issueNumber int) ([]Comment, 
 	var comments []Comment
 	if err := c.get(ctx, url, &comments); err != nil {
 		return nil, fmt.Errorf("list comments: %w", err)
+	}
+	return comments, nil
+}
+
+func (c *Client) ListPRReviewComments(ctx context.Context, prNumber int) ([]Comment, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/comments", c.owner, c.repo, prNumber)
+	var comments []Comment
+	if err := c.get(ctx, url, &comments); err != nil {
+		return nil, fmt.Errorf("list pr review comments: %w", err)
 	}
 	return comments, nil
 }
