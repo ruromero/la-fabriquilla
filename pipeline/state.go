@@ -102,7 +102,7 @@ func (rs *ReviewState) UnmarshalJSON(data []byte) error {
 		Intent      string `json:"intent"`
 	}
 	if err := json.Unmarshal(data, &legacy); err != nil {
-		return nil
+		return err
 	}
 	if legacy.Correctness != "" || legacy.Security != "" || legacy.Intent != "" {
 		rs.Findings = append(rs.Findings, review.ParseReviewFindings(legacy.Correctness, review.CategoryCorrectness)...)
