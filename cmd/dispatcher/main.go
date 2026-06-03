@@ -586,7 +586,7 @@ func reviewIterateLoop(ctx context.Context, cfg *config.Config, store *pipeline.
 			return fmt.Errorf("budget exceeded after review (iteration %d): %w", i+1, err)
 		}
 
-		if state.Review == nil || !pipeline.ReviewNeedsIteration(state.Review.Correctness, state.Review.Security, state.Review.Intent) {
+		if state.Review == nil || !pipeline.ReviewNeedsIteration(state.Review.Findings) {
 			slog.Info("review clean", "iterations", i+1)
 			return nil
 		}

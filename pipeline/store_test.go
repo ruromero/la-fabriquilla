@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 func TestFileStateStoreSaveAndLoad(t *testing.T) {
@@ -26,9 +28,7 @@ func TestFileStateStoreSaveAndLoad(t *testing.T) {
 		PlanOutcome: "plan",
 		PlanContent: "Implement LRU cache",
 		Review: &ReviewState{
-			Correctness: "[PASS]",
-			Security:    "[PASS]",
-			Intent:      "[PASS]",
+			Findings: []review.ReviewFinding{},
 		},
 		Files: []FileState{
 			{Path: "cache/lru.go", Content: "package cache"},
@@ -67,8 +67,8 @@ func TestFileStateStoreSaveAndLoad(t *testing.T) {
 		if loaded.Review == nil {
 			t.Fatal("Review is nil after round-trip")
 		}
-		if loaded.Review.Correctness != "[PASS]" {
-			t.Errorf("Review.Correctness = %q, want %q", loaded.Review.Correctness, "[PASS]")
+		if len(loaded.Review.Findings) != len(original.Review.Findings) {
+			t.Errorf("Review.Findings count = %d, want %d", len(loaded.Review.Findings), len(original.Review.Findings))
 		}
 	})
 

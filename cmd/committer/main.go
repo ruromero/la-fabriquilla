@@ -8,6 +8,7 @@ import (
 
 	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
 	"github.com/ruromero/la-fabriquilla/github"
+	"github.com/ruromero/la-fabriquilla/pipeline"
 )
 
 func main() {
@@ -55,9 +56,8 @@ func main() {
 	}
 
 	reviewSummary := ""
-	if state.Review != nil {
-		reviewSummary = fmt.Sprintf("\n\n## Review\n\n### Correctness\n%s\n\n### Security\n%s\n\n### Intent\n%s",
-			state.Review.Correctness, state.Review.Security, state.Review.Intent)
+	if state.Review != nil && len(state.Review.Findings) > 0 {
+		reviewSummary = fmt.Sprintf("\n\n## Review\n\n%s", pipeline.FormatReviewFeedback(state.Review.Findings))
 	}
 
 	prTitle := fmt.Sprintf("feat: %s", state.IssueTitle)

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 func TestStateRoundTrip(t *testing.T) {
@@ -24,9 +26,7 @@ func TestStateRoundTrip(t *testing.T) {
 		PlanOutcome:     "plan",
 		PlanContent:     "Add middleware with token bucket",
 		Review: &ReviewState{
-			Correctness: "[PASS]",
-			Security:    "[PASS]",
-			Intent:      "[PASS]",
+			Findings: []review.ReviewFinding{},
 		},
 		Files: []FileState{
 			{Path: "middleware/ratelimit.go", Content: "package middleware"},
@@ -62,8 +62,8 @@ func TestStateRoundTrip(t *testing.T) {
 	if loaded.Review == nil {
 		t.Fatal("Review is nil after round-trip")
 	}
-	if loaded.Review.Correctness != original.Review.Correctness {
-		t.Errorf("Review.Correctness = %q, want %q", loaded.Review.Correctness, original.Review.Correctness)
+	if len(loaded.Review.Findings) != len(original.Review.Findings) {
+		t.Errorf("Review.Findings count = %d, want %d", len(loaded.Review.Findings), len(original.Review.Findings))
 	}
 	if len(loaded.Files) != 1 {
 		t.Fatalf("Files count = %d, want 1", len(loaded.Files))

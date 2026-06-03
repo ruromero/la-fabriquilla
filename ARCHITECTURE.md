@@ -51,6 +51,7 @@ eval/        Golden-set test case runner and reporting
 github/      GitHub REST API client, App auth, readiness checks
 inference/   OpenAI-compatible inference client + tool-calling loop
 gemini/      Gemini API client (research phase)
+review/      Unified review finding types, ExternalReviewAdapter interface, QodoAdapter
 mcp/         MCP client (JSON-RPC over stdio)
 traces/      Structured JSON trace logging (minimal)
 ```
@@ -669,7 +670,7 @@ fabriquilla:ready → fabriquilla:in-progress → fabriquilla:done
 
 These sections from the original v2 design are not yet in the codebase:
 
-1. **Review adapter system** (`review/` package) — `ExternalReviewAdapter` interface, `QodoAdapter`, `HumanAdapter`
+1. **Human review adapter** (`review/` package) — parse GitHub PR review comments into `ReviewFinding` (ExternalReviewAdapter interface and QodoAdapter are implemented)
 2. **Reviewer binary** (`cmd/reviewer/`) — standalone binary with DeepSeek arbiter
 3. **Iterator binary** (`cmd/iterator/`) — standalone binary for applying review feedback
 4. **Feedback binary** (`cmd/feedback/`) — post-PR review loop and structured feedback capture
@@ -677,8 +678,7 @@ These sections from the original v2 design are not yet in the codebase:
 6. **Self-improvement feedback loop** — structured JSONL logging of review outcomes, periodic analysis
 7. **Scoped installation tokens** — `TokenWithPermissions()` on `AppAuth`
 8. **Post-merge monitoring** — CI watching, automatic revert PR creation
-9. **Human review adapter** — parse GitHub PR review comments into `ReviewFinding`
-10. **Merge automation** — committer checks status checks and merges on approval
+9. **Merge automation** — committer checks status checks and merges on approval
 
 ---
 

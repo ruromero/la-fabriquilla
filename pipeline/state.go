@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 type TokenUsage struct {
@@ -77,9 +79,7 @@ type State struct {
 }
 
 type ReviewState struct {
-	Correctness string `json:"correctness"`
-	Security    string `json:"security"`
-	Intent      string `json:"intent"`
+	Findings []review.ReviewFinding `json:"findings"`
 }
 
 type FileState struct {

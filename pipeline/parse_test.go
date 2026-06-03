@@ -3,6 +3,8 @@ package pipeline
 import (
 	"strings"
 	"testing"
+
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 func TestParseCodeOutput(t *testing.T) {
@@ -137,38 +139,52 @@ func TestParseStructuredCodeOutput(t *testing.T) {
 
 func TestReviewNeedsIteration(t *testing.T) {
 	t.Run("critical finding", func(t *testing.T) {
-		if !ReviewNeedsIteration("[CRITICAL] bug found", "", "") {
+		findings := []review.ReviewFinding{{Severity: review.SeverityCritical}}
+		if !ReviewNeedsIteration(findings) {
 			t.Error("expected true for CRITICAL finding")
 		}
 	})
 
 	t.Run("medium finding", func(t *testing.T) {
-		if !ReviewNeedsIteration("", "[MEDIUM] improvement needed", "") {
+		findings := []review.ReviewFinding{{Severity: review.SeverityMedium}}
+		if !ReviewNeedsIteration(findings) {
 			t.Error("expected true for MEDIUM finding")
 		}
 	})
 
 	t.Run("low finding only", func(t *testing.T) {
-		if ReviewNeedsIteration("[LOW] minor style", "[LOW] minor naming", "[PASS]") {
+		findings := []review.ReviewFinding{{Severity: review.SeverityLow}}
+		if ReviewNeedsIteration(findings) {
 			t.Error("expected false for LOW-only findings")
 		}
 	})
 
-	t.Run("pass", func(t *testing.T) {
-		if ReviewNeedsIteration("[PASS]", "[PASS]", "[PASS]") {
-			t.Error("expected false for all PASS")
+	t.Run("empty findings", func(t *testing.T) {
+		if ReviewNeedsIteration(nil) {
+			t.Error("expected false for nil findings")
 		}
 	})
 }
 
 func TestFormatReviewFeedback(t *testing.T) {
-	result := FormatReviewFeedback("correct", "secure", "aligned")
+	findings := []review.ReviewFinding{
+		{Severity: review.SeverityCritical, Title: "Bug found", Detail: "nil pointer", File: "main.go", Line: 42},
+		{Severity: review.SeverityLow, Title: "Style issue"},
+	}
+	result := FormatReviewFeedback(findings)
 	if result == "" {
 		t.Fatal("expected non-empty result")
 	}
-	for _, want := range []string{"Correctness Review", "Security Review", "Intent Review", "correct", "secure", "aligned"} {
+	for _, want := range []string{"[CRITICAL]", "Bug found", "nil pointer", "main.go:42", "[LOW]", "Style issue"} {
 		if !strings.Contains(result, want) {
 			t.Errorf("result missing %q", want)
 		}
 	}
+
+	t.Run("empty findings", func(t *testing.T) {
+		result := FormatReviewFeedback(nil)
+		if !strings.Contains(result, "[PASS]") {
+			t.Errorf("expected PASS marker for empty findings, got %q", result)
+		}
+	})
 }

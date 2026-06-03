@@ -66,9 +66,7 @@ func main() {
 	})
 
 	state.Review = &pipeline.ReviewState{
-		Correctness: review.Correctness,
-		Security:    review.Security,
-		Intent:      review.Intent,
+		Findings: review.Findings,
 	}
 	state.Phase = "review-done"
 	helpers.MustSaveState(state)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ruromero/la-fabriquilla/config"
 	"github.com/ruromero/la-fabriquilla/pipeline"
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 func writeTestState(t *testing.T, dir string, state *pipeline.State) string {
@@ -36,9 +37,7 @@ func TestReviewIterateLoop_CleanReview(t *testing.T) {
 		s, _ := pipeline.LoadState(statePath)
 		if binary == "reviewer" {
 			s.Review = &pipeline.ReviewState{
-				Correctness: "[PASS] No issues found.",
-				Security:    "[PASS] No security issues found.",
-				Intent:      "[ALIGNED]",
+				Findings: []review.ReviewFinding{},
 			}
 			s.Phase = "review-done"
 		}
@@ -76,9 +75,9 @@ func TestReviewIterateLoop_MaxIterations(t *testing.T) {
 		case "reviewer":
 			reviewerCalls++
 			s.Review = &pipeline.ReviewState{
-				Correctness: "[CRITICAL] Bug — something is wrong",
-				Security:    "[PASS] No security issues found.",
-				Intent:      "[ALIGNED]",
+				Findings: []review.ReviewFinding{
+					{Severity: review.SeverityCritical, Title: "Bug — something is wrong"},
+				},
 			}
 			s.Phase = "review-done"
 		case "iterator":
@@ -123,15 +122,13 @@ func TestReviewIterateLoop_ConvergesMidLoop(t *testing.T) {
 			reviewerCalls++
 			if reviewerCalls == 1 {
 				s.Review = &pipeline.ReviewState{
-					Correctness: "[CRITICAL] Bug — something is wrong",
-					Security:    "[PASS] No security issues found.",
-					Intent:      "[ALIGNED]",
+					Findings: []review.ReviewFinding{
+						{Severity: review.SeverityCritical, Title: "Bug — something is wrong"},
+					},
 				}
 			} else {
 				s.Review = &pipeline.ReviewState{
-					Correctness: "[PASS] No issues found.",
-					Security:    "[PASS] No security issues found.",
-					Intent:      "[ALIGNED]",
+					Findings: []review.ReviewFinding{},
 				}
 			}
 			s.Phase = "review-done"

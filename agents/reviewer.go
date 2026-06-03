@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ruromero/la-fabriquilla/inference"
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 const reviewerModel = "qwen3:14b"
@@ -59,9 +60,7 @@ Output:
 [DOCS_OUTDATED] Title — documentation not updated to match code changes`
 
 type ReviewResult struct {
-	Correctness  string
-	Security     string
-	Intent       string
+	Findings     []review.ReviewFinding
 	PromptTokens int
 	CompTokens   int
 	ToolCalls    int
@@ -102,10 +101,13 @@ func Review(ctx context.Context, cl *inference.Client, code, design, plan, conve
 	totalComp += comp
 	totalTools += tc
 
+	var findings []review.ReviewFinding
+	findings = append(findings, review.ParseReviewFindings(correctness, review.CategoryCorrectness)...)
+	findings = append(findings, review.ParseReviewFindings(security, review.CategorySecurity)...)
+	findings = append(findings, review.ParseIntentFindings(intent)...)
+
 	return ReviewResult{
-		Correctness:  correctness,
-		Security:     security,
-		Intent:       intent,
+		Findings:     findings,
 		PromptTokens: totalPrompt,
 		CompTokens:   totalComp,
 		ToolCalls:    totalTools,
