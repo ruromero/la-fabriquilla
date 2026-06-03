@@ -258,3 +258,48 @@ func TestLoadStateNotFound(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestReviewStateLegacyFormat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+
+	legacyJSON := `{
+		"repo_owner": "ruromero",
+		"repo_name": "la-fabriquilla",
+		"issue_number": 99,
+		"phase": "review-done",
+		"issue_title": "test",
+		"issue_body": "test",
+		"summaries": "",
+		"conventions": "",
+		"review": {
+			"correctness": "[CRITICAL] Nil pointer — unchecked before use",
+			"security": "[PASS] No security issues found.",
+			"intent": "[ALIGNED]"
+		},
+		"started_at": "2026-05-30T12:00:00Z",
+		"updated_at": "2026-05-30T12:00:00Z"
+	}`
+
+	if err := os.WriteFile(path, []byte(legacyJSON), 0600); err != nil {
+		t.Fatalf("write legacy state: %v", err)
+	}
+
+	loaded, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if loaded.Review == nil {
+		t.Fatal("Review is nil after loading legacy format")
+	}
+	if len(loaded.Review.Findings) != 1 {
+		t.Fatalf("Findings count = %d, want 1 (one CRITICAL from correctness)", len(loaded.Review.Findings))
+	}
+	f := loaded.Review.Findings[0]
+	if f.Severity != review.SeverityCritical {
+		t.Errorf("severity = %q, want %q", f.Severity, review.SeverityCritical)
+	}
+	if f.Category != review.CategoryCorrectness {
+		t.Errorf("category = %q, want %q", f.Category, review.CategoryCorrectness)
+	}
+}

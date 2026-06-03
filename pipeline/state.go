@@ -82,6 +82,36 @@ type ReviewState struct {
 	Findings []review.ReviewFinding `json:"findings"`
 }
 
+// UnmarshalJSON handles both the current format (findings array) and the legacy
+// format (correctness/security/intent strings) from in-flight pipeline states.
+func (rs *ReviewState) UnmarshalJSON(data []byte) error {
+	type current struct {
+		Findings []review.ReviewFinding `json:"findings"`
+	}
+	var c current
+	if err := json.Unmarshal(data, &c); err != nil {
+		return err
+	}
+	if len(c.Findings) > 0 {
+		rs.Findings = c.Findings
+		return nil
+	}
+	var legacy struct {
+		Correctness string `json:"correctness"`
+		Security    string `json:"security"`
+		Intent      string `json:"intent"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return nil
+	}
+	if legacy.Correctness != "" || legacy.Security != "" || legacy.Intent != "" {
+		rs.Findings = append(rs.Findings, review.ParseReviewFindings(legacy.Correctness, review.CategoryCorrectness)...)
+		rs.Findings = append(rs.Findings, review.ParseReviewFindings(legacy.Security, review.CategorySecurity)...)
+		rs.Findings = append(rs.Findings, review.ParseIntentFindings(legacy.Intent)...)
+	}
+	return nil
+}
+
 type FileState struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`

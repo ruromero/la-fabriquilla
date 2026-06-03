@@ -11,6 +11,7 @@ type ReviewClient struct {
 	*Client
 }
 
+// ListPRComments returns issue-level comments (issues API).
 func (rc *ReviewClient) ListPRComments(ctx context.Context, prNumber int) ([]review.PRComment, error) {
 	comments, err := rc.Client.ListComments(ctx, prNumber)
 	if err != nil {
@@ -19,6 +20,7 @@ func (rc *ReviewClient) ListPRComments(ctx context.Context, prNumber int) ([]rev
 	return toPRComments(comments), nil
 }
 
+// ListPRReviewComments returns pull-request review comments attached to diff lines (pulls API).
 func (rc *ReviewClient) ListPRReviewComments(ctx context.Context, prNumber int) ([]review.PRComment, error) {
 	comments, err := rc.Client.ListPRReviewComments(ctx, prNumber)
 	if err != nil {

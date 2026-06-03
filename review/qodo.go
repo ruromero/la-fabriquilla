@@ -2,16 +2,19 @@ package review
 
 import (
 	"context"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const defaultQodoBotLogin = "qodo-code-review[bot]"
 
 // QodoAdapter triggers and parses Qodo code reviews.
 type QodoAdapter struct {
-	BotLogin string
+	BotLogin    string
+	TriggeredAt time.Time
 }
 
 func (q *QodoAdapter) botLogin() string {
@@ -23,10 +26,12 @@ func (q *QodoAdapter) botLogin() string {
 
 // TriggerReview posts /agentic_review as an issue comment on the PR.
 func (q *QodoAdapter) TriggerReview(ctx context.Context, client PRCommentClient, prNumber int) error {
+	q.TriggeredAt = time.Now()
 	return client.CreateComment(ctx, prNumber, "/agentic_review")
 }
 
-// ReviewReady checks whether Qodo has posted its code review summary comment.
+// ReviewReady checks whether Qodo has posted its code review summary comment
+// after the most recent trigger.
 func (q *QodoAdapter) ReviewReady(ctx context.Context, client PRCommentClient, prNumber int) (bool, error) {
 	comments, err := client.ListPRComments(ctx, prNumber)
 	if err != nil {
@@ -34,14 +39,15 @@ func (q *QodoAdapter) ReviewReady(ctx context.Context, client PRCommentClient, p
 	}
 	bot := q.botLogin()
 	for _, c := range comments {
-		if c.User == bot && strings.Contains(c.Body, "Code Review by Qodo") {
+		if c.User == bot && strings.Contains(c.Body, "Code Review by Qodo") && !c.CreatedAt.Before(q.TriggeredAt) {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-// ParseFindings reads inline review comments from Qodo and extracts structured findings.
+// ParseFindings reads inline review comments from Qodo posted after the most
+// recent trigger and extracts structured findings.
 func (q *QodoAdapter) ParseFindings(ctx context.Context, client PRCommentClient, prNumber int) ([]ReviewFinding, error) {
 	comments, err := client.ListPRReviewComments(ctx, prNumber)
 	if err != nil {
@@ -50,10 +56,14 @@ func (q *QodoAdapter) ParseFindings(ctx context.Context, client PRCommentClient,
 	bot := q.botLogin()
 	var findings []ReviewFinding
 	for _, c := range comments {
-		if c.User != bot {
+		if c.User != bot || c.CreatedAt.Before(q.TriggeredAt) {
 			continue
 		}
 		f := parseQodoComment(c.Body)
+		if f.Title == "" {
+			slog.Warn("qodo comment produced no title, skipping", "comment_id", c.ID)
+			continue
+		}
 		findings = append(findings, f)
 	}
 	return findings, nil
@@ -65,18 +75,22 @@ var qodoTitlePattern = regexp.MustCompile(`\d+\\?\.\s*(.+?)\s*<code>`)
 // qodoFileRefPattern matches "path/to/file.ext[start-end]"
 var qodoFileRefPattern = regexp.MustCompile(`([\w/.+-]+\.\w+)\[(\d+)-\d+\]`)
 
-// qodoCategoryMap maps Qodo quality dimension tags to our categories.
-var qodoCategoryMap = map[string]Category{
-	"Correctness":     CategoryCorrectness,
-	"Security":        CategorySecurity,
-	"Reliability":     CategoryPerformance,
-	"Performance":     CategoryPerformance,
-	"Observability":   CategoryStyle,
-	"Architecture":    CategoryStyle,
-	"Testability":     CategoryStyle,
-	"Maintainability": CategoryStyle,
-	"Quality":         CategoryStyle,
-	"Accessibility":   CategoryStyle,
+// qodoCategoryPriority maps Qodo quality dimension tags to our categories.
+// Ordered by priority: first match wins when a comment contains multiple tags.
+var qodoCategoryPriority = []struct {
+	keyword  string
+	category Category
+}{
+	{"Correctness", CategoryCorrectness},
+	{"Security", CategorySecurity},
+	{"Reliability", CategoryErrorHandling},
+	{"Performance", CategoryPerformance},
+	{"Observability", CategoryStyle},
+	{"Architecture", CategoryStyle},
+	{"Testability", CategoryStyle},
+	{"Maintainability", CategoryStyle},
+	{"Quality", CategoryStyle},
+	{"Accessibility", CategoryStyle},
 }
 
 func parseQodoComment(body string) ReviewFinding {
@@ -121,9 +135,9 @@ func parseQodoComment(body string) ReviewFinding {
 }
 
 func extractQodoCategory(body string) Category {
-	for dim, cat := range qodoCategoryMap {
-		if strings.Contains(body, dim) {
-			return cat
+	for _, entry := range qodoCategoryPriority {
+		if strings.Contains(body, entry.keyword) {
+			return entry.category
 		}
 	}
 	return CategoryCorrectness
