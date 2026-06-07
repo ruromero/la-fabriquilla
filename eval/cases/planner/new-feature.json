@@ -1,0 +1,15 @@
+{
+  "name": "new-feature",
+  "phase": "planner",
+  "inputs": {
+    "issue_title": "Add health check HTTP endpoint",
+    "issue_body": "Add a /healthz endpoint that returns 200 OK with JSON body {\"status\":\"ok\"} when the service is running. This will be used by Kubernetes liveness probes. Acceptance criteria: GET /healthz returns 200 with correct body, endpoint is registered in the main router.",
+    "repo_language": "go",
+    "repo_structure": "cmd/dispatcher/ config/ github/ inference/"
+  },
+  "assertions": [
+    {"type": "outcome_equals", "value": "plan"},
+    {"type": "output_contains", "value": "handler"}
+  ],
+  "pass_threshold": "7/10"
+}

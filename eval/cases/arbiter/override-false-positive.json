@@ -1,0 +1,14 @@
+{
+  "name": "override-false-positive",
+  "phase": "arbiter",
+  "inputs": {
+    "review_findings": "[HIGH] Potential nil dereference in config/loader.go:28 — the result of json.Unmarshal is not checked for nil before accessing fields.",
+    "code_diff": "diff --git a/config/loader.go b/config/loader.go\n@@ -20,8 +20,12 @@ func LoadConfig(path string) (*Config, error) {\n+\tvar cfg Config\n+\tif err := json.Unmarshal(data, &cfg); err != nil {\n+\t\treturn nil, fmt.Errorf(\"parsing config: %w\", err)\n+\t}\n+\treturn &cfg, nil\n",
+    "repo_language": "go"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "override"},
+    {"type": "output_not_contains", "value": "agree"}
+  ],
+  "pass_threshold": "5/10"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "fix-nil-pointer",
+  "phase": "coder",
+  "inputs": {
+    "plan": "Fix nil pointer dereference in config.LoadConfig when the JSON file is empty (0 bytes). Add a guard clause that returns an error before attempting to access fields on the decoded struct. The fix should be in config/config.go.",
+    "repo_language": "go",
+    "existing_files": "config/config.go config/config_test.go"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "nil"},
+    {"type": "output_not_contains", "value": "panic"},
+    {"type": "compiles", "value": ""}
+  ],
+  "pass_threshold": "7/10"
+}

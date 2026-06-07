@@ -1,0 +1,16 @@
+{
+  "name": "api-endpoint",
+  "phase": "designer",
+  "inputs": {
+    "issue_title": "Add health check endpoint",
+    "plan_summary": "Add a /healthz HTTP endpoint that returns 200 OK when the service is running and ready to accept requests.",
+    "repo_language": "go",
+    "repo_structure": "cmd/dispatcher/ config/ github/ inference/"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "healthz"},
+    {"type": "file_paths_include", "value": "cmd/dispatcher/health.go"},
+    {"type": "output_not_contains", "value": "database"}
+  ],
+  "pass_threshold": "6/10"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "add-function",
+  "phase": "coder",
+  "inputs": {
+    "plan": "Add a ParseConfig function to config/config.go that reads a JSON file from disk and returns a *Config. It should return a descriptive error if the file does not exist or contains invalid JSON. Use os.ReadFile and json.Unmarshal from stdlib.",
+    "repo_language": "go",
+    "existing_files": "config/config.go config/config_test.go"
+  },
+  "assertions": [
+    {"type": "file_paths_include", "value": "config/config.go"},
+    {"type": "output_contains", "value": "func"},
+    {"type": "output_contains", "value": "ParseConfig"},
+    {"type": "compiles", "value": ""}
+  ],
+  "pass_threshold": "7/10"
+}

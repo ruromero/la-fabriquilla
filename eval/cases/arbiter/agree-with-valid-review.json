@@ -1,0 +1,14 @@
+{
+  "name": "agree-with-valid-review",
+  "phase": "arbiter",
+  "inputs": {
+    "review_findings": "[HIGH] Unbounded loop in inference/client.go:45 — retry logic has no maximum iteration cap, could spin indefinitely on persistent 500 errors causing resource exhaustion.",
+    "code_diff": "diff --git a/inference/client.go b/inference/client.go\n@@ -40,6 +40,10 @@ func (c *Client) Send(req Request) (Response, error) {\n+\tfor {\n+\t\tresp, err := c.doRequest(req)\n+\t\tif err == nil {\n+\t\t\treturn resp, nil\n+\t\t}\n+\t}\n",
+    "repo_language": "go"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "agree"},
+    {"type": "output_contains", "value": "unbounded"}
+  ],
+  "pass_threshold": "5/10"
+}

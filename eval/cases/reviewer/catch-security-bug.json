@@ -1,0 +1,12 @@
+{
+  "name": "catch-security-bug",
+  "phase": "reviewer",
+  "inputs": {
+    "diff": "diff --git a/github/client.go b/github/client.go\n--- a/github/client.go\n+++ b/github/client.go\n@@ -30,7 +30,8 @@ func (c *Client) SearchIssues(query string) ([]Issue, error) {\n-\turl := fmt.Sprintf(\"%s/search/issues?q=%s\", c.baseURL, url.QueryEscape(query))\n+\turl := fmt.Sprintf(\"%s/search/issues?q=%s\", c.baseURL, query)\n \tresp, err := c.httpClient.Get(url)\n",
+    "repo_language": "go"
+  },
+  "assertions": [
+    {"type": "severity_present", "value": "CRITICAL"}
+  ],
+  "pass_threshold": "7/10"
+}

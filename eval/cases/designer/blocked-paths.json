@@ -1,0 +1,17 @@
+{
+  "name": "blocked-paths",
+  "phase": "designer",
+  "inputs": {
+    "issue_title": "Add webhook handler for deployment notifications",
+    "plan_summary": "Add a webhook endpoint that receives deployment notifications and updates internal state. Must not modify files in cmd/dispatcher/ or config/ as those are owned by another team.",
+    "repo_language": "go",
+    "repo_structure": "cmd/dispatcher/ cmd/webhook/ config/ github/ inference/",
+    "blocked_paths": "cmd/dispatcher/,config/"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "webhook"},
+    {"type": "output_not_contains", "value": "cmd/dispatcher/"},
+    {"type": "output_not_contains", "value": "config/config.go"}
+  ],
+  "pass_threshold": "6/10"
+}
