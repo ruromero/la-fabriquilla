@@ -2,6 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -102,5 +105,73 @@ func TestSecurityConfigRoundTrip(t *testing.T) {
 	}
 	if !sc.AllowPrivateURLs {
 		t.Error("AllowPrivateURLs should be true")
+	}
+}
+
+func TestArbiterConfigValidation(t *testing.T) {
+	t.Run("base_url without model fails", func(t *testing.T) {
+		data := `{"repos":[{"owner":"a","repo":"b","token":"t"}],"arbiter":{"base_url":"https://api.deepseek.com/v1"}}`
+		dir := t.TempDir()
+		path := filepath.Join(dir, "config.json")
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := LoadConfig(path)
+		if err == nil {
+			t.Fatal("expected error when arbiter.base_url set without model")
+		}
+		if !strings.Contains(err.Error(), "arbiter.model") {
+			t.Errorf("error = %q, want mention of arbiter.model", err)
+		}
+	})
+
+	t.Run("complete arbiter config loads", func(t *testing.T) {
+		data := `{"repos":[{"owner":"a","repo":"b","token":"t"}],"arbiter":{"base_url":"https://api.deepseek.com/v1","model":"deepseek-chat"}}`
+		dir := t.TempDir()
+		path := filepath.Join(dir, "config.json")
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := LoadConfig(path)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.Arbiter.BaseURL != "https://api.deepseek.com/v1" {
+			t.Errorf("base_url = %q", cfg.Arbiter.BaseURL)
+		}
+		if cfg.Arbiter.Model != "deepseek-chat" {
+			t.Errorf("model = %q", cfg.Arbiter.Model)
+		}
+	})
+
+	t.Run("empty arbiter config is valid", func(t *testing.T) {
+		data := `{"repos":[{"owner":"a","repo":"b","token":"t"}]}`
+		dir := t.TempDir()
+		path := filepath.Join(dir, "config.json")
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := LoadConfig(path)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestArbiterAPIKeyEnvVar(t *testing.T) {
+	data := `{"repos":[{"owner":"a","repo":"b","token":"t"}],"arbiter":{"base_url":"https://api.deepseek.com/v1","model":"deepseek-chat"}}`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("ARBITER_API_KEY", "test-key-123")
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Arbiter.APIKey != "test-key-123" {
+		t.Errorf("api_key = %q, want %q", cfg.Arbiter.APIKey, "test-key-123")
 	}
 }

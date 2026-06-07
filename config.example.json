@@ -10,6 +10,10 @@
     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
     "model": "gemini-2.5-flash"
   },
+  "arbiter": {
+    "base_url": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat"
+  },
   "serena": {
     "command": "serena",
     "args": ["start-mcp-server"]
