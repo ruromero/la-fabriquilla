@@ -56,18 +56,19 @@ type State struct {
 	Summaries      string `json:"summaries"`
 	Conventions    string `json:"conventions"`
 
-	GatheredContext   string       `json:"gathered_context,omitempty"`
-	ResearchContext   string       `json:"research_context,omitempty"`
-	PlanOutcome       string       `json:"plan_outcome,omitempty"`
-	PlanContent       string       `json:"plan_content,omitempty"`
-	Design            string       `json:"design,omitempty"`
-	Code              string       `json:"code,omitempty"`
-	Review            *ReviewState `json:"review,omitempty"`
-	Files             []FileState  `json:"files,omitempty"`
-	PhaseTokens       []TokenUsage `json:"phase_tokens,omitempty"`
-	TotalPromptTokens int          `json:"total_prompt_tokens,omitempty"`
-	TotalCompTokens   int          `json:"total_completion_tokens,omitempty"`
-	TotalCostUSD      float64      `json:"total_cost_usd,omitempty"`
+	GatheredContext   string        `json:"gathered_context,omitempty"`
+	ResearchContext   string        `json:"research_context,omitempty"`
+	PlanOutcome       string        `json:"plan_outcome,omitempty"`
+	PlanContent       string        `json:"plan_content,omitempty"`
+	Design            string        `json:"design,omitempty"`
+	Code              string        `json:"code,omitempty"`
+	Review            *ReviewState  `json:"review,omitempty"`
+	ArbiterResult     *ArbiterState `json:"arbiter_result,omitempty"`
+	Files             []FileState   `json:"files,omitempty"`
+	PhaseTokens       []TokenUsage  `json:"phase_tokens,omitempty"`
+	TotalPromptTokens int           `json:"total_prompt_tokens,omitempty"`
+	TotalCompTokens   int           `json:"total_completion_tokens,omitempty"`
+	TotalCostUSD      float64       `json:"total_cost_usd,omitempty"`
 
 	PRNumber int    `json:"pr_number,omitempty"`
 	PRBranch string `json:"pr_branch,omitempty"`
@@ -110,6 +111,11 @@ func (rs *ReviewState) UnmarshalJSON(data []byte) error {
 		rs.Findings = append(rs.Findings, review.ParseIntentFindings(legacy.Intent)...)
 	}
 	return nil
+}
+
+type ArbiterState struct {
+	Findings        []review.ArbiterFinding `json:"findings"`
+	DismissedTitles []string                `json:"dismissed_titles,omitempty"`
 }
 
 type FileState struct {

@@ -303,3 +303,52 @@ func TestReviewStateLegacyFormat(t *testing.T) {
 		t.Errorf("category = %q, want %q", f.Category, review.CategoryCorrectness)
 	}
 }
+
+func TestArbiterStateRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+
+	original := &State{
+		RepoOwner:   "ruromero",
+		RepoName:    "la-fabriquilla",
+		IssueNumber: 42,
+		Phase:       "review-done",
+		IssueTitle:  "test",
+		IssueBody:   "test",
+		Summaries:   "",
+		Conventions: "",
+		ArbiterResult: &ArbiterState{
+			Findings: []review.ArbiterFinding{
+				{
+					Finding:        review.ReviewFinding{Source: "factory", Severity: review.SeverityCritical, Title: "bug"},
+					Classification: review.ClassFixHere,
+					Reason:         "simple fix",
+				},
+			},
+			DismissedTitles: []string{"old finding"},
+		},
+		StartedAt: time.Date(2026, 6, 7, 12, 0, 0, 0, time.UTC),
+	}
+
+	if err := SaveState(path, original); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+
+	loaded, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+
+	if loaded.ArbiterResult == nil {
+		t.Fatal("ArbiterResult is nil after round-trip")
+	}
+	if len(loaded.ArbiterResult.Findings) != 1 {
+		t.Fatalf("findings count = %d, want 1", len(loaded.ArbiterResult.Findings))
+	}
+	if loaded.ArbiterResult.Findings[0].Classification != review.ClassFixHere {
+		t.Errorf("classification = %q, want %q", loaded.ArbiterResult.Findings[0].Classification, review.ClassFixHere)
+	}
+	if len(loaded.ArbiterResult.DismissedTitles) != 1 || loaded.ArbiterResult.DismissedTitles[0] != "old finding" {
+		t.Errorf("dismissed_titles = %v, want [old finding]", loaded.ArbiterResult.DismissedTitles)
+	}
+}
