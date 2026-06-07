@@ -51,6 +51,11 @@ CGO_ENABLED=0 go build ./...
 - traces/ — structured JSON trace logging
 - agents/ — agent phases (planner, designer, coder, reviewer, iterator)
 
+## Spec files
+
+- Design specs in `docs/superpowers/specs/` are local-only — never commit them
+- They exist for local review during implementation, not as repo artifacts
+
 ## Security invariants
 
 - Credentials never enter agent prompts or LLM context

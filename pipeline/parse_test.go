@@ -188,3 +188,58 @@ func TestFormatReviewFeedback(t *testing.T) {
 		}
 	})
 }
+
+func TestArbiterNeedsIteration(t *testing.T) {
+	t.Run("fix_here triggers iteration", func(t *testing.T) {
+		findings := []review.ArbiterFinding{
+			{Classification: review.ClassFixHere},
+		}
+		if !ArbiterNeedsIteration(findings) {
+			t.Error("expected true for fix_here")
+		}
+	})
+
+	t.Run("subtask triggers iteration", func(t *testing.T) {
+		findings := []review.ArbiterFinding{
+			{Classification: review.ClassSubtask},
+		}
+		if !ArbiterNeedsIteration(findings) {
+			t.Error("expected true for subtask")
+		}
+	})
+
+	t.Run("root_cause only does not trigger", func(t *testing.T) {
+		findings := []review.ArbiterFinding{
+			{Classification: review.ClassRootCause},
+		}
+		if ArbiterNeedsIteration(findings) {
+			t.Error("expected false for root_cause only")
+		}
+	})
+
+	t.Run("dismissed only does not trigger", func(t *testing.T) {
+		findings := []review.ArbiterFinding{
+			{Classification: review.ClassDismissed},
+		}
+		if ArbiterNeedsIteration(findings) {
+			t.Error("expected false for dismissed only")
+		}
+	})
+
+	t.Run("mixed with fix_here triggers", func(t *testing.T) {
+		findings := []review.ArbiterFinding{
+			{Classification: review.ClassDismissed},
+			{Classification: review.ClassRootCause},
+			{Classification: review.ClassFixHere},
+		}
+		if !ArbiterNeedsIteration(findings) {
+			t.Error("expected true when fix_here is present")
+		}
+	})
+
+	t.Run("nil findings", func(t *testing.T) {
+		if ArbiterNeedsIteration(nil) {
+			t.Error("expected false for nil findings")
+		}
+	})
+}

@@ -31,6 +31,7 @@ type Config struct {
 	Serena           SerenaConfig         `json:"serena"`
 	Sandbox          SandboxConfig        `json:"sandbox,omitempty"`
 	Security         SecurityConfig       `json:"security,omitempty"`
+	Arbiter          ArbiterConfig        `json:"arbiter,omitempty"`
 	Repos            []RepoConfig         `json:"repos"`
 	Apps             map[string]AppConfig `json:"apps,omitempty"`
 	StateDir         string               `json:"state_dir,omitempty"`
@@ -58,6 +59,16 @@ type PlannerConfig struct {
 // SecurityConfig holds security-related settings.
 type SecurityConfig struct {
 	AllowPrivateURLs bool `json:"allow_private_urls"`
+}
+
+type ArbiterConfig struct {
+	BaseURL string `json:"base_url"`
+	Model   string `json:"model"`
+	APIKey  string `json:"-"`
+}
+
+func (a ArbiterConfig) Enabled() bool {
+	return a.BaseURL != ""
 }
 
 type SerenaConfig struct {
@@ -165,6 +176,10 @@ func LoadConfig(path string) (Config, error) {
 		cfg.Planner.APIKey = v
 	}
 
+	if v := os.Getenv("ARBITER_API_KEY"); v != "" {
+		cfg.Arbiter.APIKey = v
+	}
+
 	if v := os.Getenv("PIPELINE_STATE_DIR"); v != "" {
 		cfg.StateDir = v
 	}
@@ -208,6 +223,10 @@ func LoadConfig(path string) (Config, error) {
 		if cfg.Sandbox.Image == "" {
 			return Config{}, fmt.Errorf("sandbox.image is required when sandbox is enabled")
 		}
+	}
+
+	if cfg.Arbiter.BaseURL != "" && cfg.Arbiter.Model == "" {
+		return Config{}, fmt.Errorf("arbiter.model is required when arbiter.base_url is set")
 	}
 
 	if len(cfg.Repos) == 0 {

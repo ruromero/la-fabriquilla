@@ -126,3 +126,12 @@ func FormatReviewFeedback(findings []review.ReviewFinding) string {
 	}
 	return b.String()
 }
+
+func ArbiterNeedsIteration(findings []review.ArbiterFinding) bool {
+	for _, f := range findings {
+		if f.Classification == review.ClassFixHere || f.Classification == review.ClassSubtask {
+			return true
+		}
+	}
+	return false
+}
