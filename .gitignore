@@ -30,6 +30,9 @@ bin/
 # env file
 .env
 
+# Design specs (local-only)
+docs/superpowers/
+
 # Editor/IDE
 # .idea/
 # .vscode/
