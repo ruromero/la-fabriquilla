@@ -12,7 +12,8 @@
   },
   "arbiter": {
     "base_url": "https://api.deepseek.com/v1",
-    "model": "deepseek-chat"
+    "model": "deepseek-chat",
+    "_comment": "Set ARBITER_API_KEY env var for authentication"
   },
   "serena": {
     "command": "serena",

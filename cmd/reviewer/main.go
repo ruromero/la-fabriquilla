@@ -70,6 +70,10 @@ func main() {
 		Findings: rev.Findings,
 	}
 
+	if !cfg.Arbiter.Enabled() {
+		state.ArbiterResult = nil
+	}
+
 	if cfg.Arbiter.Enabled() {
 		arbCl := inference.NewClient(cfg.Arbiter.BaseURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
 
@@ -80,12 +84,14 @@ func main() {
 
 		arbStart := time.Now()
 		arb, arbErr := agents.Arbitrate(ctx, arbCl, cfg.Arbiter.Model,
-			rev.Findings, state.Conventions, "", state.PlanContent,
+			rev.Findings, state.Conventions, state.Summaries, state.PlanContent,
 			dismissedTitles)
 		arbElapsed := time.Since(arbStart)
 		if arbErr != nil {
-			slog.Error("arbiter phase failed", "error", arbErr)
-			os.Exit(1)
+			slog.Warn("arbiter phase failed, falling back to severity-based review", "error", arbErr)
+			state.Phase = "review-done"
+			helpers.MustSaveState(state)
+			return
 		}
 
 		state.RecordTokenUsage("arbiter", arb.Model, arb.PromptTokens, arb.CompTokens, 0, arbElapsed.Seconds())

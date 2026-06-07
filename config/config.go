@@ -64,7 +64,7 @@ type SecurityConfig struct {
 type ArbiterConfig struct {
 	BaseURL string `json:"base_url"`
 	Model   string `json:"model"`
-	APIKey  string `json:"api_key,omitempty"`
+	APIKey  string `json:"-"`
 }
 
 func (a ArbiterConfig) Enabled() bool {

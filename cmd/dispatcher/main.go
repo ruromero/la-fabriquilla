@@ -587,7 +587,7 @@ func reviewIterateLoop(ctx context.Context, cfg *config.Config, store *pipeline.
 		}
 
 		needsIteration := false
-		if state.ArbiterResult != nil {
+		if cfg.Arbiter.Enabled() && state.ArbiterResult != nil {
 			needsIteration = pipeline.ArbiterNeedsIteration(state.ArbiterResult.Findings)
 		} else if state.Review != nil {
 			needsIteration = pipeline.ReviewNeedsIteration(state.Review.Findings)
