@@ -152,3 +152,50 @@ func TestReviewIterateLoop_ConvergesMidLoop(t *testing.T) {
 		t.Errorf("expected 1 iterator call, got %d", iteratorCalls)
 	}
 }
+
+func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
+	dir := t.TempDir()
+	state := &pipeline.State{
+		IssueNumber: 1,
+		Code:        "package main",
+		Phase:       "commit-done",
+	}
+	statePath := writeTestState(t, dir, state)
+
+	store := pipeline.NewFileStateStore(dir)
+	key := "state"
+
+	calls := 0
+	runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
+		calls++
+		s, _ := pipeline.LoadState(statePath)
+		if binary == "reviewer" {
+			s.Review = &pipeline.ReviewState{
+				Findings: []review.ReviewFinding{
+					{Severity: review.SeverityCritical, Title: "false positive"},
+				},
+			}
+			s.ArbiterResult = &pipeline.ArbiterState{
+				Findings: []review.ArbiterFinding{
+					{
+						Finding:        review.ReviewFinding{Severity: review.SeverityCritical, Title: "false positive"},
+						Classification: review.ClassDismissed,
+						Reason:         "invalid per conventions",
+					},
+				},
+			}
+			s.Phase = "review-done"
+		}
+		pipeline.SaveState(statePath, s)
+		return nil
+	}
+
+	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
+	err := reviewIterateLoop(context.Background(), cfg, store, key, statePath, "", 1, runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls != 1 {
+		t.Errorf("expected 1 call (reviewer only, arbiter dismissed all), got %d", calls)
+	}
+}
