@@ -12,6 +12,7 @@ import (
 	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/mcp"
 	"github.com/ruromero/la-fabriquilla/pipeline"
+	"github.com/ruromero/la-fabriquilla/review"
 	"github.com/ruromero/la-fabriquilla/traces"
 )
 
@@ -43,21 +44,21 @@ func main() {
 	tools, handler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
-	review, err := agents.Review(ctx, cl, state.Code, state.Design, state.PlanContent, state.Conventions, tools, handler)
+	rev, err := agents.Review(ctx, cl, state.Code, state.Design, state.PlanContent, state.Conventions, tools, handler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("review phase failed", "error", err)
 		os.Exit(1)
 	}
 
-	state.RecordTokenUsage("reviewer", review.Model, review.PromptTokens, review.CompTokens, review.ToolCalls, elapsed.Seconds())
+	state.RecordTokenUsage("reviewer", rev.Model, rev.PromptTokens, rev.CompTokens, rev.ToolCalls, elapsed.Seconds())
 	traces.Log(traces.Trace{
 		IssueNumber:     state.IssueNumber,
 		Phase:           "reviewer",
-		Model:           review.Model,
-		PromptTokens:    review.PromptTokens,
-		CompTokens:      review.CompTokens,
-		ToolCalls:       review.ToolCalls,
+		Model:           rev.Model,
+		PromptTokens:    rev.PromptTokens,
+		CompTokens:      rev.CompTokens,
+		ToolCalls:       rev.ToolCalls,
 		Duration:        elapsed.String(),
 		StartedAt:       start,
 		CumPromptTokens: state.TotalPromptTokens,
@@ -66,8 +67,72 @@ func main() {
 	})
 
 	state.Review = &pipeline.ReviewState{
-		Findings: review.Findings,
+		Findings: rev.Findings,
 	}
+
+	if cfg.Arbiter.Enabled() {
+		arbCl := inference.NewClient(cfg.Arbiter.BaseURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
+
+		var dismissedTitles []string
+		if state.ArbiterResult != nil {
+			dismissedTitles = state.ArbiterResult.DismissedTitles
+		}
+
+		arbStart := time.Now()
+		arb, arbErr := agents.Arbitrate(ctx, arbCl, cfg.Arbiter.Model,
+			rev.Findings, state.Conventions, "", state.PlanContent,
+			dismissedTitles)
+		arbElapsed := time.Since(arbStart)
+		if arbErr != nil {
+			slog.Error("arbiter phase failed", "error", arbErr)
+			os.Exit(1)
+		}
+
+		state.RecordTokenUsage("arbiter", arb.Model, arb.PromptTokens, arb.CompTokens, 0, arbElapsed.Seconds())
+		traces.Log(traces.Trace{
+			IssueNumber:     state.IssueNumber,
+			Phase:           "arbiter",
+			Model:           arb.Model,
+			PromptTokens:    arb.PromptTokens,
+			CompTokens:      arb.CompTokens,
+			Duration:        arbElapsed.String(),
+			StartedAt:       arbStart,
+			CumPromptTokens: state.TotalPromptTokens,
+			CumCompTokens:   state.TotalCompTokens,
+			CumCostUSD:      state.TotalCostUSD,
+		})
+
+		var newDismissed []string
+		newDismissed = append(newDismissed, dismissedTitles...)
+		for _, f := range arb.Result.Findings {
+			if f.Classification == review.ClassDismissed {
+				newDismissed = append(newDismissed, f.Finding.Title)
+			}
+		}
+		state.ArbiterResult = &pipeline.ArbiterState{
+			Findings:        arb.Result.Findings,
+			DismissedTitles: newDismissed,
+		}
+
+		slog.Info("arbiter completed",
+			"total_findings", len(arb.Result.Findings),
+			"fix_here", countClassification(arb.Result.Findings, review.ClassFixHere),
+			"subtask", countClassification(arb.Result.Findings, review.ClassSubtask),
+			"root_cause", countClassification(arb.Result.Findings, review.ClassRootCause),
+			"dismissed", countClassification(arb.Result.Findings, review.ClassDismissed),
+		)
+	}
+
 	state.Phase = "review-done"
 	helpers.MustSaveState(state)
+}
+
+func countClassification(findings []review.ArbiterFinding, c review.Classification) int {
+	n := 0
+	for _, f := range findings {
+		if f.Classification == c {
+			n++
+		}
+	}
+	return n
 }
