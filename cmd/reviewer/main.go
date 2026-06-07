@@ -89,6 +89,7 @@ func main() {
 		arbElapsed := time.Since(arbStart)
 		if arbErr != nil {
 			slog.Warn("arbiter phase failed, falling back to severity-based review", "error", arbErr)
+			state.ArbiterResult = nil
 			state.Phase = "review-done"
 			helpers.MustSaveState(state)
 			return
