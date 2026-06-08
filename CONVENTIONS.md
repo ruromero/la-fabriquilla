@@ -55,3 +55,41 @@
 - Test files named `*_test.go` in the same package
 - Use `t.Run` for subtests
 - Race detector enabled in CI (`go test -race`)
+
+### Test quality
+
+- Tests must call real production functions — never reimplement logic
+  locally to approximate what the real code does
+- Use production types directly (e.g. `review.ArbiterResult`, not a
+  local struct with the same JSON tags)
+- Test inputs must include the data shapes production code actually
+  produces — if production schemas use `[]string`, test with `[]string`
+  not just `[]any`
+- Every test must pass its input through a real code path and assert an
+  observable outcome — `_ = payload` followed by a static check is not
+  a test
+- When the function under test lives in a package you can't import
+  (circular dependency), move the test to that package rather than
+  building a local approximation
+- Use stdlib helpers (`strings.Contains`, `strings.HasPrefix`) — don't
+  write custom string search functions in test files
+
+### Security tests
+
+- Adversarial corpus lives in `testdata/adversarial/*.json`, each file
+  is `[]adversarialCase` with fields `name`, `category`, `input`
+- Load via `loadAdversarialCorpus(t)` helper (returns
+  `map[string][]adversarialCase`)
+- Iterate with nested `t.Run(category, func() { t.Run(tc.Name, ...) })`
+- Security test files are named `*_security_test.go` or
+  `*_injection_test.go`
+- HTTP boundary tests use `httptest.NewServer` to capture and inspect
+  requests sent by production code
+
+### General test patterns
+
+- Table-driven: `for _, tt := range tests { t.Run(tt.name, ...) }`
+- Mocks implement production interfaces with minimal fields — never
+  duplicate production structs
+- Tests stay in the same package as production code (no `_test` suffix
+  packages)
