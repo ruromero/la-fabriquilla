@@ -1,0 +1,15 @@
+{
+  "name": "simple-bug-fix",
+  "phase": "planner",
+  "inputs": {
+    "issue_title": "Nil pointer dereference in config loader when file is empty",
+    "issue_body": "When config.json is empty (0 bytes), LoadConfig panics with a nil pointer dereference at config.go:42. Expected behavior: return a meaningful error instead of crashing.",
+    "repo_language": "go",
+    "repo_structure": "cmd/ config/ github/ inference/"
+  },
+  "assertions": [
+    {"type": "outcome_equals", "value": "plan"},
+    {"type": "output_contains", "value": "nil"}
+  ],
+  "pass_threshold": "7/10"
+}

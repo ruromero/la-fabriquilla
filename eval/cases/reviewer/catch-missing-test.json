@@ -1,0 +1,12 @@
+{
+  "name": "catch-missing-test",
+  "phase": "reviewer",
+  "inputs": {
+    "diff": "diff --git a/inference/retry.go b/inference/retry.go\nnew file mode 100644\n--- /dev/null\n+++ b/inference/retry.go\n@@ -0,0 +1,35 @@\n+package inference\n+\n+import (\n+\t\"math\"\n+\t\"net/http\"\n+\t\"time\"\n+)\n+\n+// RetryTransport wraps an http.RoundTripper with exponential backoff retry.\n+type RetryTransport struct {\n+\tBase       http.RoundTripper\n+\tMaxRetries int\n+}\n+\n+func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {\n+\tvar resp *http.Response\n+\tvar err error\n+\tfor attempt := 0; attempt <= t.MaxRetries; attempt++ {\n+\t\tresp, err = t.Base.RoundTrip(req)\n+\t\tif err == nil && resp.StatusCode < 500 {\n+\t\t\treturn resp, nil\n+\t\t}\n+\t\tbackoff := time.Duration(math.Pow(2, float64(attempt))) * time.Second\n+\t\ttime.Sleep(backoff)\n+\t}\n+\treturn resp, err\n+}\n",
+    "repo_language": "go"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "test"}
+  ],
+  "pass_threshold": "7/10"
+}

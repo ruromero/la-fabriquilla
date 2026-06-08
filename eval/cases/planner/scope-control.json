@@ -1,0 +1,16 @@
+{
+  "name": "scope-control",
+  "phase": "planner",
+  "inputs": {
+    "issue_title": "Add retry logic to HTTP client",
+    "issue_body": "The GitHub API client should retry on 5xx errors with exponential backoff (max 3 retries). Also while we are at it we should refactor the entire logging subsystem to use structured logging and migrate the database schema to support multi-tenancy.",
+    "repo_language": "go",
+    "repo_structure": "cmd/ config/ github/ inference/"
+  },
+  "assertions": [
+    {"type": "outcome_equals", "value": "plan"},
+    {"type": "output_contains", "value": "retry"},
+    {"type": "output_not_contains", "value": "multi-tenancy"}
+  ],
+  "pass_threshold": "5/10"
+}

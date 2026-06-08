@@ -1,0 +1,16 @@
+{
+  "name": "new-config-field",
+  "phase": "designer",
+  "inputs": {
+    "issue_title": "Add configurable timeout per phase",
+    "plan_summary": "Add a phase_timeouts map in config.json allowing per-phase timeout overrides. Default to max_phase_duration when not specified.",
+    "repo_language": "go",
+    "repo_structure": "cmd/dispatcher/ config/ pipeline/"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "config"},
+    {"type": "file_paths_include", "value": "config/config.go"},
+    {"type": "output_not_contains", "value": "environment variable"}
+  ],
+  "pass_threshold": "6/10"
+}

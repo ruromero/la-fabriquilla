@@ -1,0 +1,16 @@
+{
+  "name": "internal-package",
+  "phase": "designer",
+  "inputs": {
+    "issue_title": "Extract HTTP retry logic into shared package",
+    "plan_summary": "Move the retry-with-backoff logic from inference/client.go and github/client.go into a new internal httputil package to eliminate duplication.",
+    "repo_language": "go",
+    "repo_structure": "cmd/ config/ github/ inference/ mcp/"
+  },
+  "assertions": [
+    {"type": "file_count_gte", "value": "2"},
+    {"type": "output_contains", "value": "httputil"},
+    {"type": "output_not_contains", "value": "external dependency"}
+  ],
+  "pass_threshold": "6/10"
+}

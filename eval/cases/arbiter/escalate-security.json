@@ -1,0 +1,13 @@
+{
+  "name": "escalate-security",
+  "phase": "arbiter",
+  "inputs": {
+    "review_findings": "[LOW] Variable naming could be improved in sandbox/sanitize.go:15 — consider renaming 'inp' to 'input' for clarity.",
+    "code_diff": "diff --git a/sandbox/sanitize.go b/sandbox/sanitize.go\n@@ -10,6 +10,12 @@ func Sanitize(inp string) string {\n+\t// Execute user-provided command for custom sanitization\n+\tcmd := exec.Command(\"sh\", \"-c\", inp)\n+\tout, err := cmd.Output()\n+\tif err != nil {\n+\t\treturn inp\n+\t}\n+\treturn string(out)\n",
+    "repo_language": "go"
+  },
+  "assertions": [
+    {"type": "severity_present", "value": "CRITICAL"}
+  ],
+  "pass_threshold": "5/10"
+}

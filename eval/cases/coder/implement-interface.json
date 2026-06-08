@@ -1,0 +1,16 @@
+{
+  "name": "implement-interface",
+  "phase": "coder",
+  "inputs": {
+    "plan": "Implement the ExternalReviewAdapter interface in review/qodo.go for the QodoAdapter struct. The interface requires methods: TriggerReview(ctx, client, prNumber) error, ReviewReady(ctx, client, prNumber) (bool, error), and ParseFindings(ctx, client, prNumber) ([]ReviewFinding, error). TriggerReview posts a comment requesting review. ReviewReady checks if the tool has responded. ParseFindings extracts structured findings.",
+    "repo_language": "go",
+    "existing_files": "review/adapter.go review/qodo.go review/types.go"
+  },
+  "assertions": [
+    {"type": "file_paths_include", "value": "review/qodo.go"},
+    {"type": "output_contains", "value": "func"},
+    {"type": "output_contains", "value": "QodoAdapter"},
+    {"type": "compiles", "value": ""}
+  ],
+  "pass_threshold": "7/10"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "add-test",
+  "phase": "coder",
+  "inputs": {
+    "plan": "Add unit test coverage for the inference/client.go Chat method. Test cases should cover: successful response parsing, HTTP error handling (non-200 status), and malformed JSON response. Use net/http/httptest for a mock server.",
+    "repo_language": "go",
+    "existing_files": "inference/client.go inference/client_test.go"
+  },
+  "assertions": [
+    {"type": "file_paths_include", "value": "inference/client_test.go"},
+    {"type": "output_contains", "value": "func Test"},
+    {"type": "compiles", "value": ""}
+  ],
+  "pass_threshold": "7/10"
+}

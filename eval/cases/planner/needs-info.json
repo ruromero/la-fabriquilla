@@ -1,0 +1,14 @@
+{
+  "name": "needs-info",
+  "phase": "planner",
+  "inputs": {
+    "issue_title": "Improve performance",
+    "issue_body": "The system is slow sometimes. Can we make it faster?",
+    "repo_language": "go",
+    "repo_structure": "cmd/ config/ github/ inference/"
+  },
+  "assertions": [
+    {"type": "outcome_equals", "value": "needs_info"}
+  ],
+  "pass_threshold": "5/10"
+}

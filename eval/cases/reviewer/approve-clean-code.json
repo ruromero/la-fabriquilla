@@ -1,0 +1,13 @@
+{
+  "name": "approve-clean-code",
+  "phase": "reviewer",
+  "inputs": {
+    "diff": "diff --git a/config/config.go b/config/config.go\n--- a/config/config.go\n+++ b/config/config.go\n@@ -15,6 +15,19 @@ type Config struct {\n \tRepoPath string `json:\"repo_path\"`\n }\n \n+// Validate checks that all required fields are set.\n+func (c *Config) Validate() error {\n+\tif c.RepoPath == \"\" {\n+\t\treturn fmt.Errorf(\"config: repo_path is required\")\n+\t}\n+\treturn nil\n+}\n",
+    "diff_test": "diff --git a/config/config_test.go b/config/config_test.go\n--- a/config/config_test.go\n+++ b/config/config_test.go\n@@ -10,6 +10,22 @@ import \"testing\"\n+func TestConfigValidate(t *testing.T) {\n+\tt.Run(\"valid\", func(t *testing.T) {\n+\t\tc := &Config{RepoPath: \"/tmp/repo\"}\n+\t\tif err := c.Validate(); err != nil {\n+\t\t\tt.Fatalf(\"unexpected error: %v\", err)\n+\t\t}\n+\t})\n+\tt.Run(\"missing repo_path\", func(t *testing.T) {\n+\t\tc := &Config{}\n+\t\tif err := c.Validate(); err == nil {\n+\t\t\tt.Fatal(\"expected error\")\n+\t\t}\n+\t})\n+}\n",
+    "repo_language": "go"
+  },
+  "assertions": [
+    {"type": "outcome_equals", "value": "approve"}
+  ],
+  "pass_threshold": "7/10"
+}
