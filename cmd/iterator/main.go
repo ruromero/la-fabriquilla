@@ -41,11 +41,12 @@ func main() {
 	}
 	tools, handler := harness.BuildCoderTools(serenaClient)
 
-	if state.Review == nil {
+	effective := pipeline.EffectiveFindings(state.ArbiterResult, state.Review)
+	if len(effective) == 0 {
 		slog.Error("no review findings in state")
 		os.Exit(1)
 	}
-	feedback := pipeline.FormatReviewFeedback(state.Review.Findings)
+	feedback := pipeline.FormatReviewFeedback(effective)
 
 	start := time.Now()
 	iterResult, err := agents.IterateWithUsage(ctx, cl, state.Code, feedback, tools, handler)

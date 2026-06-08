@@ -1,5 +1,15 @@
 package review
 
+import "encoding/json"
+
+// DismissKey returns a composite key for deduplicating findings across
+// arbiter iterations. Line is excluded because it can shift between edits.
+// Uses JSON array encoding to avoid delimiter collisions.
+func DismissKey(f ReviewFinding) string {
+	b, _ := json.Marshal([]string{f.Source, string(f.Category), f.Title, f.File})
+	return string(b)
+}
+
 type Classification string
 
 const (

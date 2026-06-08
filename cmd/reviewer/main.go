@@ -77,15 +77,15 @@ func main() {
 	if cfg.Arbiter.Enabled() {
 		arbCl := inference.NewClient(cfg.Arbiter.BaseURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
 
-		var dismissedTitles []string
+		var dismissedKeys []string
 		if state.ArbiterResult != nil {
-			dismissedTitles = state.ArbiterResult.DismissedTitles
+			dismissedKeys = state.ArbiterResult.DismissedKeys
 		}
 
 		arbStart := time.Now()
 		arb, arbErr := agents.Arbitrate(ctx, arbCl, cfg.Arbiter.Model,
 			rev.Findings, state.Conventions, state.Summaries, state.PlanContent,
-			dismissedTitles)
+			dismissedKeys)
 		arbElapsed := time.Since(arbStart)
 		if arbErr != nil {
 			slog.Warn("arbiter phase failed, falling back to severity-based review", "error", arbErr)
@@ -110,15 +110,15 @@ func main() {
 		})
 
 		var newDismissed []string
-		newDismissed = append(newDismissed, dismissedTitles...)
+		newDismissed = append(newDismissed, dismissedKeys...)
 		for _, f := range arb.Result.Findings {
 			if f.Classification == review.ClassDismissed {
-				newDismissed = append(newDismissed, f.Finding.Title)
+				newDismissed = append(newDismissed, review.DismissKey(f.Finding))
 			}
 		}
 		state.ArbiterResult = &pipeline.ArbiterState{
-			Findings:        arb.Result.Findings,
-			DismissedTitles: newDismissed,
+			Findings:      arb.Result.Findings,
+			DismissedKeys: newDismissed,
 		}
 
 		slog.Info("arbiter completed",

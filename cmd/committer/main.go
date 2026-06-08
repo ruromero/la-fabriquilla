@@ -56,8 +56,8 @@ func main() {
 	}
 
 	reviewSummary := ""
-	if state.Review != nil && len(state.Review.Findings) > 0 {
-		reviewSummary = fmt.Sprintf("\n\n## Review\n\n%s", pipeline.FormatReviewFeedback(state.Review.Findings))
+	if effective := pipeline.EffectiveFindings(state.ArbiterResult, state.Review); len(effective) > 0 {
+		reviewSummary = fmt.Sprintf("\n\n## Review\n\n%s", pipeline.FormatReviewFeedback(effective))
 	}
 
 	prTitle := fmt.Sprintf("feat: %s", state.IssueTitle)

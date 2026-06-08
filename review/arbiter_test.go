@@ -5,6 +5,31 @@ import (
 	"testing"
 )
 
+func TestDismissKey(t *testing.T) {
+	f1 := ReviewFinding{Source: "factory", Category: CategoryCorrectness, Title: "bug", File: "main.go"}
+	f2 := ReviewFinding{Source: "factory", Category: CategoryCorrectness, Title: "bug", File: "other.go"}
+	f3 := ReviewFinding{Source: "qodo", Category: CategoryCorrectness, Title: "bug", File: "main.go"}
+
+	if DismissKey(f1) == DismissKey(f2) {
+		t.Error("same title, different file should produce different keys")
+	}
+	if DismissKey(f1) == DismissKey(f3) {
+		t.Error("same title, different source should produce different keys")
+	}
+
+	f1Copy := f1
+	f1Copy.Line = 99
+	if DismissKey(f1) != DismissKey(f1Copy) {
+		t.Error("line difference should not affect dismiss key")
+	}
+
+	pipeInTitle := ReviewFinding{Source: "a", Category: "b", Title: "c|d", File: "e"}
+	pipeInFile := ReviewFinding{Source: "a", Category: "b", Title: "c", File: "d|e"}
+	if DismissKey(pipeInTitle) == DismissKey(pipeInFile) {
+		t.Error("pipe in different fields should not produce same key")
+	}
+}
+
 func TestClassificationConstants(t *testing.T) {
 	for _, tt := range []struct {
 		c    Classification

@@ -320,12 +320,12 @@ func TestArbiterStateRoundTrip(t *testing.T) {
 		ArbiterResult: &ArbiterState{
 			Findings: []review.ArbiterFinding{
 				{
-					Finding:        review.ReviewFinding{Source: "factory", Severity: review.SeverityCritical, Title: "bug"},
+					Finding:        review.ReviewFinding{Source: "factory", Severity: review.SeverityCritical, Category: review.CategoryCorrectness, Title: "bug", File: "main.go"},
 					Classification: review.ClassFixHere,
 					Reason:         "simple fix",
 				},
 			},
-			DismissedTitles: []string{"old finding"},
+			DismissedKeys: []string{review.DismissKey(review.ReviewFinding{Source: "factory", Category: review.CategoryCorrectness, Title: "old finding", File: "handler.go"})},
 		},
 		StartedAt: time.Date(2026, 6, 7, 12, 0, 0, 0, time.UTC),
 	}
@@ -348,7 +348,30 @@ func TestArbiterStateRoundTrip(t *testing.T) {
 	if loaded.ArbiterResult.Findings[0].Classification != review.ClassFixHere {
 		t.Errorf("classification = %q, want %q", loaded.ArbiterResult.Findings[0].Classification, review.ClassFixHere)
 	}
-	if len(loaded.ArbiterResult.DismissedTitles) != 1 || loaded.ArbiterResult.DismissedTitles[0] != "old finding" {
-		t.Errorf("dismissed_titles = %v, want [old finding]", loaded.ArbiterResult.DismissedTitles)
+	wantKey := review.DismissKey(review.ReviewFinding{Source: "factory", Category: review.CategoryCorrectness, Title: "old finding", File: "handler.go"})
+	if len(loaded.ArbiterResult.DismissedKeys) != 1 || loaded.ArbiterResult.DismissedKeys[0] != wantKey {
+		t.Errorf("dismissed_keys = %v, want [%s]", loaded.ArbiterResult.DismissedKeys, wantKey)
+	}
+}
+
+func TestArbiterStateLegacyDismissedTitles(t *testing.T) {
+	raw := []byte(`{"findings":[],"dismissed_titles":["legacy title"]}`)
+	var as ArbiterState
+	if err := json.Unmarshal(raw, &as); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(as.DismissedKeys) != 1 || as.DismissedKeys[0] != "legacy title" {
+		t.Errorf("DismissedKeys = %v, want [legacy title]", as.DismissedKeys)
+	}
+}
+
+func TestArbiterStateNewFormatPreferred(t *testing.T) {
+	raw := []byte(`{"findings":[],"dismissed_keys":["new key"],"dismissed_titles":["old title"]}`)
+	var as ArbiterState
+	if err := json.Unmarshal(raw, &as); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(as.DismissedKeys) != 1 || as.DismissedKeys[0] != "new key" {
+		t.Errorf("DismissedKeys = %v, want [new key] (new format should take precedence)", as.DismissedKeys)
 	}
 }
