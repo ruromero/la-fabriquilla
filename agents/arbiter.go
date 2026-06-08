@@ -82,6 +82,10 @@ func Arbitrate(ctx context.Context, cl *inference.Client, model string,
 		return ArbiterOutput{}, fmt.Errorf("parse arbiter response: %w", err)
 	}
 
+	if len(result.Findings) != len(remaining) {
+		return ArbiterOutput{}, fmt.Errorf("arbiter returned %d findings, expected %d: partial response", len(result.Findings), len(remaining))
+	}
+
 	result.Findings = append(result.Findings, autoDismissed...)
 
 	return ArbiterOutput{

@@ -22,6 +22,12 @@ func TestDismissKey(t *testing.T) {
 	if DismissKey(f1) != DismissKey(f1Copy) {
 		t.Error("line difference should not affect dismiss key")
 	}
+
+	pipeInTitle := ReviewFinding{Source: "a", Category: "b", Title: "c|d", File: "e"}
+	pipeInFile := ReviewFinding{Source: "a", Category: "b", Title: "c", File: "d|e"}
+	if DismissKey(pipeInTitle) == DismissKey(pipeInFile) {
+		t.Error("pipe in different fields should not produce same key")
+	}
 }
 
 func TestClassificationConstants(t *testing.T) {

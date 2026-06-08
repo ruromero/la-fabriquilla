@@ -118,6 +118,25 @@ type ArbiterState struct {
 	DismissedKeys []string                `json:"dismissed_keys,omitempty"`
 }
 
+// UnmarshalJSON handles both the current format (dismissed_keys) and the legacy
+// format (dismissed_titles) from in-flight pipeline states.
+func (as *ArbiterState) UnmarshalJSON(data []byte) error {
+	type plain ArbiterState
+	var p plain
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	*as = ArbiterState(p)
+	if len(as.DismissedKeys) == 0 {
+		var legacy struct {
+			DismissedTitles []string `json:"dismissed_titles"`
+		}
+		json.Unmarshal(data, &legacy)
+		as.DismissedKeys = legacy.DismissedTitles
+	}
+	return nil
+}
+
 type FileState struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`

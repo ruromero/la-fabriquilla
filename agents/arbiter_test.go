@@ -400,3 +400,30 @@ func TestArbitrate_DeadlockPrevention_MergesAutoDismissed(t *testing.T) {
 		t.Errorf("dismissed = %d, want 1", dismissed)
 	}
 }
+
+func TestArbitrate_PartialResponseReturnsError(t *testing.T) {
+	srv := fakeArbiterServer(t, func(findings []review.ReviewFinding) review.ArbiterResult {
+		if len(findings) < 2 {
+			return review.ArbiterResult{}
+		}
+		return review.ArbiterResult{Findings: []review.ArbiterFinding{
+			{Finding: findings[0], Classification: review.ClassFixHere, Reason: "fix"},
+		}}
+	})
+	defer srv.Close()
+
+	cl := inference.NewClient(srv.URL)
+	_, err := Arbitrate(context.Background(), cl, "test-model",
+		[]review.ReviewFinding{
+			{Source: "factory", Severity: review.SeverityCritical, Category: review.CategoryCorrectness, Title: "bug one"},
+			{Source: "factory", Severity: review.SeverityMedium, Category: review.CategorySecurity, Title: "bug two"},
+		},
+		"", "", "", nil)
+
+	if err == nil {
+		t.Fatal("expected error for partial arbiter response")
+	}
+	if !strings.Contains(err.Error(), "partial response") {
+		t.Errorf("error = %q, want it to mention partial response", err)
+	}
+}
