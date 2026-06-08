@@ -229,6 +229,18 @@ func TestValidateToolArgs(t *testing.T) {
 			wantErr: "required field missing: path",
 		},
 		{
+			name: "required_as_string_slice",
+			args: map[string]any{},
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path": map[string]any{"type": "string"},
+				},
+				"required": []string{"path"},
+			},
+			wantErr: "required field missing: path",
+		},
+		{
 			name:    "nil_schema_passes",
 			args:    map[string]any{"anything": "goes"},
 			schema:  nil,

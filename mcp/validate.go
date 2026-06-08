@@ -130,17 +130,20 @@ func checkType(field string, val any, expected string) error {
 }
 
 func toStringSlice(v any) ([]string, bool) {
-	arr, ok := v.([]any)
-	if !ok {
+	switch arr := v.(type) {
+	case []string:
+		return arr, true
+	case []any:
+		result := make([]string, 0, len(arr))
+		for _, item := range arr {
+			s, ok := item.(string)
+			if !ok {
+				return nil, false
+			}
+			result = append(result, s)
+		}
+		return result, true
+	default:
 		return nil, false
 	}
-	result := make([]string, 0, len(arr))
-	for _, item := range arr {
-		s, ok := item.(string)
-		if !ok {
-			return nil, false
-		}
-		result = append(result, s)
-	}
-	return result, true
 }

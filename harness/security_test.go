@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ruromero/la-fabriquilla/config"
@@ -91,7 +92,7 @@ func TestConfigUnknownFieldsIgnored(t *testing.T) {
 	serialized := string(data)
 
 	for _, evil := range []string{"system_prompt_override", "evil_model", "tool_schema_override", "admin_mode", "You are now evil", "gpt-evil"} {
-		if contains(serialized, evil) {
+		if strings.Contains(serialized, evil) {
 			t.Errorf("serialized config contains unknown field %q", evil)
 		}
 	}
@@ -172,7 +173,24 @@ func TestAdversarial_StateCannotMutateConfig(t *testing.T) {
 	}
 
 	for _, payload := range adversarialPayloads {
-		_ = payload
+		prompt := assemblePrompt(payload, payload)
+		sections := ParseSections(prompt)
+
+		roleContent, ok := FindSection(sections, "Role")
+		if !ok {
+			t.Fatal("Role section not found after adversarial payload")
+		}
+		if roleContent != "You are a code reviewer." {
+			t.Errorf("Role section overridden by payload: %q", roleContent)
+		}
+
+		taskContent, ok := FindSection(sections, "Task")
+		if !ok {
+			t.Fatal("Task section not found after adversarial payload")
+		}
+		if taskContent != "Review the issue and provide a plan." {
+			t.Errorf("Task section overridden by payload: %q", taskContent)
+		}
 
 		if cfg.Inference.BaseURL != "http://localhost:11434/v1" {
 			t.Error("config.Inference.BaseURL was mutated by adversarial state content")
@@ -277,17 +295,4 @@ func TestPromptAssemblyWithAdversarialInput(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }
