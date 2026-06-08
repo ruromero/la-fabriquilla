@@ -124,16 +124,16 @@ var arbiterOutputSchema = map[string]any{
 	"required": []string{"findings"},
 }
 
-func filterDismissedFindings(findings []review.ReviewFinding, dismissedTitles []string) (remaining []review.ReviewFinding, autoDismissed []review.ArbiterFinding) {
-	if len(dismissedTitles) == 0 {
+func filterDismissedFindings(findings []review.ReviewFinding, dismissedKeys []string) (remaining []review.ReviewFinding, autoDismissed []review.ArbiterFinding) {
+	if len(dismissedKeys) == 0 {
 		return findings, nil
 	}
-	dismissed := make(map[string]bool, len(dismissedTitles))
-	for _, t := range dismissedTitles {
-		dismissed[t] = true
+	dismissed := make(map[string]bool, len(dismissedKeys))
+	for _, k := range dismissedKeys {
+		dismissed[k] = true
 	}
 	for _, f := range findings {
-		if dismissed[f.Title] {
+		if dismissed[review.DismissKey(f)] {
 			autoDismissed = append(autoDismissed, review.ArbiterFinding{
 				Finding:        f,
 				Classification: review.ClassDismissed,
@@ -150,6 +150,16 @@ func parseArbiterResponse(content string) (review.ArbiterResult, error) {
 	var result review.ArbiterResult
 	if err := json.Unmarshal([]byte(content), &result); err != nil {
 		return review.ArbiterResult{}, fmt.Errorf("unmarshal arbiter result: %w", err)
+	}
+	for i, f := range result.Findings {
+		switch f.Classification {
+		case review.ClassFixHere, review.ClassSubtask, review.ClassRootCause, review.ClassDismissed:
+		default:
+			return review.ArbiterResult{}, fmt.Errorf("finding %d (%q): invalid classification %q", i, f.Finding.Title, f.Classification)
+		}
+		if f.Classification == review.ClassRootCause && f.ProposedTitle == "" {
+			return review.ArbiterResult{}, fmt.Errorf("finding %d (%q): root_cause classification requires proposed_title", i, f.Finding.Title)
+		}
 	}
 	return result, nil
 }

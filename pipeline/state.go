@@ -114,8 +114,8 @@ func (rs *ReviewState) UnmarshalJSON(data []byte) error {
 }
 
 type ArbiterState struct {
-	Findings        []review.ArbiterFinding `json:"findings"`
-	DismissedTitles []string                `json:"dismissed_titles,omitempty"`
+	Findings      []review.ArbiterFinding `json:"findings"`
+	DismissedKeys []string                `json:"dismissed_keys,omitempty"`
 }
 
 type FileState struct {

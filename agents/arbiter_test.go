@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ruromero/la-fabriquilla/inference"
@@ -14,13 +15,13 @@ import (
 
 func TestFilterDismissedFindings(t *testing.T) {
 	findings := []review.ReviewFinding{
-		{Title: "nil pointer deref", Severity: review.SeverityCritical},
-		{Title: "missing error check", Severity: review.SeverityMedium},
-		{Title: "old dismissed finding", Severity: review.SeverityCritical},
+		{Source: "factory", Category: review.CategoryCorrectness, Title: "nil pointer deref", File: "main.go", Severity: review.SeverityCritical},
+		{Source: "factory", Category: review.CategoryCorrectness, Title: "missing error check", File: "util.go", Severity: review.SeverityMedium},
+		{Source: "qodo", Category: review.CategorySecurity, Title: "old dismissed finding", File: "handler.go", Severity: review.SeverityCritical},
 	}
 
-	t.Run("filters previously dismissed", func(t *testing.T) {
-		dismissed := []string{"old dismissed finding"}
+	t.Run("filters previously dismissed by composite key", func(t *testing.T) {
+		dismissed := []string{review.DismissKey(findings[2])}
 		remaining, autoDismissed := filterDismissedFindings(findings, dismissed)
 		if len(remaining) != 2 {
 			t.Fatalf("remaining = %d, want 2", len(remaining))
@@ -36,7 +37,25 @@ func TestFilterDismissedFindings(t *testing.T) {
 		}
 	})
 
-	t.Run("no dismissed titles passes all through", func(t *testing.T) {
+	t.Run("same title different file not dismissed", func(t *testing.T) {
+		sameTitle := []review.ReviewFinding{
+			{Source: "factory", Category: review.CategoryCorrectness, Title: "bug", File: "a.go"},
+			{Source: "factory", Category: review.CategoryCorrectness, Title: "bug", File: "b.go"},
+		}
+		dismissed := []string{review.DismissKey(sameTitle[0])}
+		remaining, autoDismissed := filterDismissedFindings(sameTitle, dismissed)
+		if len(remaining) != 1 {
+			t.Fatalf("remaining = %d, want 1", len(remaining))
+		}
+		if remaining[0].File != "b.go" {
+			t.Errorf("remaining file = %q, want b.go", remaining[0].File)
+		}
+		if len(autoDismissed) != 1 {
+			t.Fatalf("autoDismissed = %d, want 1", len(autoDismissed))
+		}
+	})
+
+	t.Run("no dismissed keys passes all through", func(t *testing.T) {
 		remaining, autoDismissed := filterDismissedFindings(findings, nil)
 		if len(remaining) != 3 {
 			t.Fatalf("remaining = %d, want 3", len(remaining))
@@ -86,6 +105,39 @@ func TestParseArbiterResponse(t *testing.T) {
 		}
 		if len(result.Findings) != 0 {
 			t.Fatalf("findings count = %d, want 0", len(result.Findings))
+		}
+	})
+
+	t.Run("invalid classification", func(t *testing.T) {
+		input := `{"findings":[{"finding":{"source":"factory","severity":"critical","category":"correctness","title":"bug"},"classification":"invalid_value","reason":"test"}]}`
+		_, err := parseArbiterResponse(input)
+		if err == nil {
+			t.Fatal("expected error for invalid classification")
+		}
+		if !strings.Contains(err.Error(), "invalid classification") {
+			t.Errorf("error = %q, want it to mention invalid classification", err)
+		}
+	})
+
+	t.Run("root_cause without proposed_title", func(t *testing.T) {
+		input := `{"findings":[{"finding":{"source":"factory","severity":"medium","category":"correctness","title":"systemic issue"},"classification":"root_cause","reason":"needs own issue"}]}`
+		_, err := parseArbiterResponse(input)
+		if err == nil {
+			t.Fatal("expected error for root_cause without proposed_title")
+		}
+		if !strings.Contains(err.Error(), "proposed_title") {
+			t.Errorf("error = %q, want it to mention proposed_title", err)
+		}
+	})
+
+	t.Run("root_cause with proposed_title succeeds", func(t *testing.T) {
+		input := `{"findings":[{"finding":{"source":"factory","severity":"medium","category":"correctness","title":"systemic issue"},"classification":"root_cause","reason":"needs own issue","proposed_title":"Fix systemic issue"}]}`
+		result, err := parseArbiterResponse(input)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Findings[0].Classification != review.ClassRootCause {
+			t.Errorf("classification = %q, want root_cause", result.Findings[0].Classification)
 		}
 	})
 }
@@ -314,12 +366,13 @@ func TestArbitrate_DeadlockPrevention_MergesAutoDismissed(t *testing.T) {
 	defer srv.Close()
 
 	cl := inference.NewClient(srv.URL)
+	dismissedFinding := review.ReviewFinding{Source: "factory", Severity: review.SeverityCritical, Category: review.CategoryCorrectness, Title: "previously dismissed bug"}
 	out, err := Arbitrate(context.Background(), cl, "test-model",
 		[]review.ReviewFinding{
 			{Source: "factory", Severity: review.SeverityCritical, Category: review.CategoryCorrectness, Title: "new bug"},
-			{Source: "factory", Severity: review.SeverityCritical, Category: review.CategoryCorrectness, Title: "previously dismissed bug"},
+			dismissedFinding,
 		},
-		"", "", "", []string{"previously dismissed bug"})
+		"", "", "", []string{review.DismissKey(dismissedFinding)})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

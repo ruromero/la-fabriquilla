@@ -325,7 +325,7 @@ func TestArbiterStateRoundTrip(t *testing.T) {
 					Reason:         "simple fix",
 				},
 			},
-			DismissedTitles: []string{"old finding"},
+			DismissedKeys: []string{"old finding"},
 		},
 		StartedAt: time.Date(2026, 6, 7, 12, 0, 0, 0, time.UTC),
 	}
@@ -348,7 +348,7 @@ func TestArbiterStateRoundTrip(t *testing.T) {
 	if loaded.ArbiterResult.Findings[0].Classification != review.ClassFixHere {
 		t.Errorf("classification = %q, want %q", loaded.ArbiterResult.Findings[0].Classification, review.ClassFixHere)
 	}
-	if len(loaded.ArbiterResult.DismissedTitles) != 1 || loaded.ArbiterResult.DismissedTitles[0] != "old finding" {
-		t.Errorf("dismissed_titles = %v, want [old finding]", loaded.ArbiterResult.DismissedTitles)
+	if len(loaded.ArbiterResult.DismissedKeys) != 1 || loaded.ArbiterResult.DismissedKeys[0] != "old finding" {
+		t.Errorf("dismissed_titles = %v, want [old finding]", loaded.ArbiterResult.DismissedKeys)
 	}
 }

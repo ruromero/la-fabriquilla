@@ -243,3 +243,68 @@ func TestArbiterNeedsIteration(t *testing.T) {
 		}
 	})
 }
+
+func TestEffectiveFindings(t *testing.T) {
+	raw := &ReviewState{
+		Findings: []review.ReviewFinding{
+			{Source: "factory", Severity: review.SeverityCritical, Title: "real bug", File: "main.go"},
+			{Source: "factory", Severity: review.SeverityLow, Title: "style nit", File: "util.go"},
+			{Source: "qodo", Severity: review.SeverityMedium, Title: "missing test", File: "handler.go"},
+		},
+	}
+
+	t.Run("nil arbiter returns raw findings", func(t *testing.T) {
+		result := EffectiveFindings(nil, raw)
+		if len(result) != 3 {
+			t.Fatalf("got %d findings, want 3", len(result))
+		}
+	})
+
+	t.Run("empty arbiter findings returns raw", func(t *testing.T) {
+		arbiter := &ArbiterState{Findings: nil}
+		result := EffectiveFindings(arbiter, raw)
+		if len(result) != 3 {
+			t.Fatalf("got %d findings, want 3", len(result))
+		}
+	})
+
+	t.Run("filters to fix_here and subtask only", func(t *testing.T) {
+		arbiter := &ArbiterState{
+			Findings: []review.ArbiterFinding{
+				{Finding: raw.Findings[0], Classification: review.ClassFixHere, Reason: "fix it"},
+				{Finding: raw.Findings[1], Classification: review.ClassDismissed, Reason: "not important"},
+				{Finding: raw.Findings[2], Classification: review.ClassSubtask, Reason: "needs work"},
+			},
+		}
+		result := EffectiveFindings(arbiter, raw)
+		if len(result) != 2 {
+			t.Fatalf("got %d findings, want 2", len(result))
+		}
+		if result[0].Title != "real bug" {
+			t.Errorf("result[0].Title = %q, want %q", result[0].Title, "real bug")
+		}
+		if result[1].Title != "missing test" {
+			t.Errorf("result[1].Title = %q, want %q", result[1].Title, "missing test")
+		}
+	})
+
+	t.Run("all dismissed returns empty", func(t *testing.T) {
+		arbiter := &ArbiterState{
+			Findings: []review.ArbiterFinding{
+				{Finding: raw.Findings[0], Classification: review.ClassDismissed, Reason: "false positive"},
+				{Finding: raw.Findings[1], Classification: review.ClassRootCause, Reason: "systemic", ProposedTitle: "Fix it"},
+			},
+		}
+		result := EffectiveFindings(arbiter, raw)
+		if len(result) != 0 {
+			t.Fatalf("got %d findings, want 0", len(result))
+		}
+	})
+
+	t.Run("nil raw and nil arbiter returns nil", func(t *testing.T) {
+		result := EffectiveFindings(nil, nil)
+		if result != nil {
+			t.Fatalf("got %v, want nil", result)
+		}
+	})
+}

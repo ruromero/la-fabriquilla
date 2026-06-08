@@ -1,5 +1,11 @@
 package review
 
+// DismissKey returns a composite key for deduplicating findings across
+// arbiter iterations. Line is excluded because it can shift between edits.
+func DismissKey(f ReviewFinding) string {
+	return f.Source + "|" + string(f.Category) + "|" + f.Title + "|" + f.File
+}
+
 type Classification string
 
 const (

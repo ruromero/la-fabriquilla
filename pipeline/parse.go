@@ -135,3 +135,22 @@ func ArbiterNeedsIteration(findings []review.ArbiterFinding) bool {
 	}
 	return false
 }
+
+// EffectiveFindings returns the subset of review findings that should
+// be acted on after arbiter classification. Only findings classified
+// as fix_here or subtask are returned.
+func EffectiveFindings(arbiter *ArbiterState, raw *ReviewState) []review.ReviewFinding {
+	if arbiter == nil || len(arbiter.Findings) == 0 {
+		if raw == nil {
+			return nil
+		}
+		return raw.Findings
+	}
+	var effective []review.ReviewFinding
+	for _, af := range arbiter.Findings {
+		if af.Classification == review.ClassFixHere || af.Classification == review.ClassSubtask {
+			effective = append(effective, af.Finding)
+		}
+	}
+	return effective
+}
