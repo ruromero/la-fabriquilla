@@ -30,6 +30,9 @@ bin/
 # env file
 .env
 
+# Local config (contains credentials and private endpoints — use config.example.json as template)
+config.json
+
 # Design specs (local-only)
 docs/superpowers/
 
