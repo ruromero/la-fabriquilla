@@ -59,6 +59,11 @@ func main() {
 		return
 	}
 
+	if cfg.Inference.BaseURL == "" {
+		slog.Error("inference.base_url is required in config")
+		os.Exit(1)
+	}
+
 	agentModel := cfg.Inference.Model
 	if *model != "" {
 		agentModel = *model
@@ -158,10 +163,12 @@ func main() {
 		}
 	}
 
-	fmt.Print(eval.FormatReport(results))
-	for _, s := range skipped {
-		fmt.Printf("SKIPPED  %s (phase not supported in v1 or arbiter not configured)\n", s)
+	if len(results) == 0 && len(skipped) > 0 {
+		slog.Error("all matched cases were skipped; check -phase filter and arbiter config", "skipped", skipped)
+		os.Exit(1)
 	}
+
+	fmt.Print(eval.FormatReport(results, skipped))
 
 	for _, r := range results {
 		if !r.Pass {

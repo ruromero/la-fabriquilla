@@ -61,7 +61,7 @@ func main() {
 		results = append(results, result)
 	}
 
-	fmt.Print(eval.FormatReport(results))
+	fmt.Print(eval.FormatReport(results, nil))
 
 	for _, r := range results {
 		if !r.Pass {

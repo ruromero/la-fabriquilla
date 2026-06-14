@@ -304,7 +304,7 @@ func TestFormatReport(t *testing.T) {
 		},
 	}
 
-	report := FormatReport(results)
+	report := FormatReport(results, nil)
 	if report == "" {
 		t.Fatal("report should not be empty")
 	}

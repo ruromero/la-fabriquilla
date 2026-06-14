@@ -6,8 +6,9 @@ import (
 )
 
 // FormatReport produces a human-readable evaluation summary from the
-// given run results.
-func FormatReport(results []RunResult) string {
+// given run results. Skipped lists phase/case names skipped because the
+// phase is unsupported or unconfigured.
+func FormatReport(results []RunResult, skipped []string) string {
 	var b strings.Builder
 	b.WriteString("Golden-Set Evaluation Report\n")
 	b.WriteString("============================\n\n")
@@ -26,6 +27,10 @@ func FormatReport(results []RunResult) string {
 		for _, f := range r.Failures {
 			b.WriteString(fmt.Sprintf("  - %s\n", f))
 		}
+	}
+
+	for _, s := range skipped {
+		b.WriteString(fmt.Sprintf("%-45s SKIPPED\n", s))
 	}
 
 	b.WriteString(fmt.Sprintf("\nOverall: %d/%d passed\n", passed, len(results)))

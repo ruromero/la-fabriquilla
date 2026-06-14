@@ -52,9 +52,13 @@ func AppendRecord(dir string, rec Record) error {
 }
 
 // LoadRecords reads every record from all .jsonl files in dir.
+// Returns an empty slice (no error) when dir does not exist yet.
 func LoadRecords(dir string) ([]Record, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("read results dir: %w", err)
 	}
 	var records []Record
