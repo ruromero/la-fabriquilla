@@ -2,6 +2,7 @@ package eval
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -303,7 +304,7 @@ func TestFormatReport(t *testing.T) {
 		},
 	}
 
-	report := FormatReport(results)
+	report := FormatReport(results, nil)
 	if report == "" {
 		t.Fatal("report should not be empty")
 	}
@@ -311,5 +312,41 @@ func TestFormatReport(t *testing.T) {
 		if !strings.Contains(report, want) {
 			t.Errorf("report missing %q", want)
 		}
+	}
+}
+
+func TestRunCaseEErrorCountsAsFailedRun(t *testing.T) {
+	tc := TestCase{
+		Name:          "errcase",
+		Phase:         "planner",
+		Assertions:    []Assertion{{Type: "output_contains", Value: "x"}},
+		PassThreshold: "1/2",
+	}
+	calls := 0
+	fn := func(tc TestCase, run int) (string, []FileState, error) {
+		calls++
+		if run == 1 {
+			return "", nil, fmt.Errorf("inference timeout")
+		}
+		return "x", nil, nil
+	}
+	res, err := RunCaseE(tc, 2, fn)
+	if err != nil {
+		t.Fatalf("RunCaseE: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("suite stopped early: %d calls", calls)
+	}
+	if res.Passes != 1 || !res.Pass {
+		t.Errorf("passes=%d pass=%v, want 1/true", res.Passes, res.Pass)
+	}
+	found := false
+	for _, f := range res.Failures {
+		if strings.Contains(f, "inference timeout") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("error not recorded in failures: %v", res.Failures)
 	}
 }

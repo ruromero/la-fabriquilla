@@ -175,3 +175,39 @@ func TestArbiterAPIKeyEnvVar(t *testing.T) {
 		t.Errorf("api_key = %q, want %q", cfg.Arbiter.APIKey, "test-key-123")
 	}
 }
+
+func TestEvalConfigDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"repos":[{"owner":"o","repo":"r","token":"x"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Eval.CasesDir != "tests/golden" {
+		t.Errorf("CasesDir = %q, want tests/golden", cfg.Eval.CasesDir)
+	}
+	if cfg.Eval.TimeoutPerRun.Duration != 5*time.Minute {
+		t.Errorf("TimeoutPerRun = %v, want 5m", cfg.Eval.TimeoutPerRun.Duration)
+	}
+	if cfg.Eval.ResultsDir != "eval-results" {
+		t.Errorf("ResultsDir = %q, want eval-results", cfg.Eval.ResultsDir)
+	}
+}
+
+func TestInferenceModelParsed(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"inference":{"model":"qwen2.5-coder:14b"},"repos":[{"owner":"o","repo":"r","token":"x"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Inference.Model != "qwen2.5-coder:14b" {
+		t.Errorf("Model = %q", cfg.Inference.Model)
+	}
+}

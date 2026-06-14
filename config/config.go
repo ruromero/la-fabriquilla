@@ -10,6 +10,7 @@ import (
 type InferenceConfig struct {
 	BaseURL string `json:"base_url"`
 	APIKey  string `json:"api_key,omitempty"`
+	Model   string `json:"model,omitempty"`
 }
 
 type Config struct {
@@ -32,6 +33,7 @@ type Config struct {
 	Sandbox          SandboxConfig        `json:"sandbox,omitempty"`
 	Security         SecurityConfig       `json:"security,omitempty"`
 	Arbiter          ArbiterConfig        `json:"arbiter,omitempty"`
+	Eval             EvalConfig           `json:"eval,omitempty"`
 	Repos            []RepoConfig         `json:"repos"`
 	Apps             map[string]AppConfig `json:"apps,omitempty"`
 	StateDir         string               `json:"state_dir,omitempty"`
@@ -91,6 +93,14 @@ func (c *Config) PhaseDuration(phase string) time.Duration {
 		return c.MaxPhaseDuration.Duration
 	}
 	return 15 * time.Minute
+}
+
+// EvalConfig holds settings for the golden-set eval runner.
+type EvalConfig struct {
+	CasesDir      string   `json:"cases_dir"`
+	RunsPerCase   int      `json:"runs_per_case"`
+	TimeoutPerRun Duration `json:"timeout_per_run"`
+	ResultsDir    string   `json:"results_dir"`
 }
 
 type RepoConfig struct {
@@ -158,6 +168,11 @@ func LoadConfig(path string) (Config, error) {
 			"deploy/*",
 		},
 		StateDir: "/data/pipeline",
+		Eval: EvalConfig{
+			CasesDir:      "tests/golden",
+			TimeoutPerRun: Duration{5 * time.Minute},
+			ResultsDir:    "eval-results",
+		},
 	}
 
 	if err := json.Unmarshal(data, &cfg); err != nil {

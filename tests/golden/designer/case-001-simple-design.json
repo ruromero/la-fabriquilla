@@ -1,0 +1,15 @@
+{
+  "name": "designer-produces-structured-design",
+  "phase": "designer",
+  "inputs": {
+    "plan": "PLAN:\n1. Add a Retry helper to config/helpers.go that wraps a function with exponential backoff (modifies existing helpers file)\n2. Use it in github/client.go for transient HTTP failures (modifies existing code)",
+    "research_context": "",
+    "conventions": "Errors wrap with fmt.Errorf. Use log/slog for logging. Zero external dependencies."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "config/helpers.go"},
+    {"type": "output_contains", "value": "Retry"},
+    {"type": "output_not_contains", "value": "go get "}
+  ],
+  "pass_threshold": "8/10"
+}

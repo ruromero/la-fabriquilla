@@ -48,9 +48,14 @@ type FileState struct {
 // it returns mock data.
 type OutputFunc func(tc TestCase, run int) (output string, files []FileState)
 
-// RunCase executes a test case the specified number of times using
-// outputFn to produce output per run. Returns a RunResult.
-func RunCase(tc TestCase, runs int, outputFn OutputFunc) (RunResult, error) {
+// OutputFuncE is like OutputFunc but may return an error (e.g. inference
+// failure or timeout). An errored run counts as a failed run; the suite
+// continues.
+type OutputFuncE func(tc TestCase, run int) (string, []FileState, error)
+
+// RunCaseE executes a test case like RunCase, treating output errors as
+// failed runs rather than aborting the case.
+func RunCaseE(tc TestCase, runs int, outputFn OutputFuncE) (RunResult, error) {
 	threshold, totalRuns, err := ParseThreshold(tc.PassThreshold)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("case %s: %w", tc.Name, err)
@@ -59,7 +64,11 @@ func RunCase(tc TestCase, runs int, outputFn OutputFunc) (RunResult, error) {
 	passes := 0
 	var failures []string
 	for run := 1; run <= runs; run++ {
-		output, files := outputFn(tc, run)
+		output, files, err := outputFn(tc, run)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("Run %d: run error: %v", run, err))
+			continue
+		}
 		allPassed := true
 		for _, a := range tc.Assertions {
 			if !CheckAssertion(a, output, files) {
@@ -82,6 +91,15 @@ func RunCase(tc TestCase, runs int, outputFn OutputFunc) (RunResult, error) {
 		Pass:      passes >= threshold,
 		Failures:  failures,
 	}, nil
+}
+
+// RunCase executes a test case the specified number of times using
+// outputFn to produce output per run. Returns a RunResult.
+func RunCase(tc TestCase, runs int, outputFn OutputFunc) (RunResult, error) {
+	return RunCaseE(tc, runs, func(tc TestCase, run int) (string, []FileState, error) {
+		output, files := outputFn(tc, run)
+		return output, files, nil
+	})
 }
 
 // LoadTestCases loads all .json test case files from dir and its
