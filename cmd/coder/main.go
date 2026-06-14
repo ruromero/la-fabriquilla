@@ -17,6 +17,10 @@ import (
 
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
+	if cfg.Inference.Model == "" {
+		slog.Error("inference.model is required in config")
+		os.Exit(1)
+	}
 
 	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
 	ctx := context.Background()
@@ -44,7 +48,7 @@ func main() {
 	gatherTools, gatherHandler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
-	codeResult, err := agents.CodeWithUsage(ctx, cl, state.Design, state.ResearchContext, state.Conventions, coderTools, coderHandler)
+	codeResult, err := agents.CodeWithUsage(ctx, cl, cfg.Inference.Model, state.Design, state.ResearchContext, state.Conventions, coderTools, coderHandler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("code phase failed", "error", err)
@@ -96,7 +100,7 @@ func main() {
 		feedback := pipeline.FormatReviewFeedback(review.Findings)
 
 		start = time.Now()
-		iterResult, err := agents.IterateWithUsage(ctx, cl, code, feedback, coderTools, coderHandler)
+		iterResult, err := agents.IterateWithUsage(ctx, cl, cfg.Inference.Model, code, feedback, coderTools, coderHandler)
 		elapsed = time.Since(start)
 		if err != nil {
 			slog.Error("iterate phase failed", "iteration", i+1, "error", err)

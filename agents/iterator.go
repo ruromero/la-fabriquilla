@@ -41,18 +41,18 @@ type IterateResult struct {
 	Model        string
 }
 
-func Iterate(ctx context.Context, cl *inference.Client, code, reviewFeedback string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
-	r, err := IterateWithUsage(ctx, cl, code, reviewFeedback, tools, handler)
+func Iterate(ctx context.Context, cl *inference.Client, model, code, reviewFeedback string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
+	r, err := IterateWithUsage(ctx, cl, model, code, reviewFeedback, tools, handler)
 	return r.Content, err
 }
 
 // IterateWithUsage works like Iterate but also returns token usage.
-func IterateWithUsage(ctx context.Context, cl *inference.Client, code, reviewFeedback string, tools []inference.Tool, handler inference.ToolHandler) (IterateResult, error) {
+func IterateWithUsage(ctx context.Context, cl *inference.Client, model, code, reviewFeedback string, tools []inference.Tool, handler inference.ToolHandler) (IterateResult, error) {
 	userPrompt := fmt.Sprintf("## Current Code\n\n%s\n\n## Review Feedback\n\n%s", code, reviewFeedback)
 
 	temp := float64(0)
 	req := inference.ChatRequest{
-		Model: coderModel,
+		Model: model,
 		Messages: []inference.Message{
 			{Role: "system", Content: iteratorSystemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -81,6 +81,6 @@ func IterateWithUsage(ctx context.Context, cl *inference.Client, code, reviewFee
 		PromptTokens: resp.Usage.PromptTokens,
 		CompTokens:   resp.Usage.CompletionTokens,
 		ToolCalls:    resp.Usage.ToolCallCount,
-		Model:        coderModel,
+		Model:        model,
 	}, nil
 }

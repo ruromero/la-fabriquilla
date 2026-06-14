@@ -7,8 +7,6 @@ import (
 	"github.com/ruromero/la-fabriquilla/inference"
 )
 
-const designerModel = "qwen3:14b"
-
 const designerSystemPrompt = `You are a software architect. Given an implementation plan, produce a technical design document that includes:
 
 1. API contracts (endpoints, request/response schemas)
@@ -27,13 +25,13 @@ type DesignResult struct {
 	Model        string
 }
 
-func Design(ctx context.Context, cl *inference.Client, plan, researchContext, conventions string) (string, error) {
-	r, err := DesignWithUsage(ctx, cl, plan, researchContext, conventions)
+func Design(ctx context.Context, cl *inference.Client, model, plan, researchContext, conventions string) (string, error) {
+	r, err := DesignWithUsage(ctx, cl, model, plan, researchContext, conventions)
 	return r.Content, err
 }
 
 // DesignWithUsage works like Design but also returns token usage.
-func DesignWithUsage(ctx context.Context, cl *inference.Client, plan, researchContext, conventions string) (DesignResult, error) {
+func DesignWithUsage(ctx context.Context, cl *inference.Client, model, plan, researchContext, conventions string) (DesignResult, error) {
 	userPrompt := fmt.Sprintf("## Implementation Plan\n\n%s", plan)
 	if conventions != "" {
 		userPrompt += fmt.Sprintf("\n\n## Project Conventions\n\nFollow these conventions:\n\n%s", conventions)
@@ -44,7 +42,7 @@ func DesignWithUsage(ctx context.Context, cl *inference.Client, plan, researchCo
 
 	temp := float64(0)
 	resp, err := cl.Chat(ctx, inference.ChatRequest{
-		Model: designerModel,
+		Model: model,
 		Messages: []inference.Message{
 			{Role: "system", Content: designerSystemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -59,6 +57,6 @@ func DesignWithUsage(ctx context.Context, cl *inference.Client, plan, researchCo
 		Content:      resp.Choices[0].Message.Content,
 		PromptTokens: resp.Usage.PromptTokens,
 		CompTokens:   resp.Usage.CompletionTokens,
-		Model:        designerModel,
+		Model:        model,
 	}, nil
 }

@@ -8,8 +8,6 @@ import (
 	"github.com/ruromero/la-fabriquilla/pipeline"
 )
 
-const coderModel = "qwen3:14b"
-
 const coderSystemPrompt = `You are a software developer. Given a technical design, implement the code changes.
 
 When you have finished all tool calls and are ready to output the final code,
@@ -43,13 +41,13 @@ type CodeResult struct {
 	Model        string
 }
 
-func Code(ctx context.Context, cl *inference.Client, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
-	r, err := CodeWithUsage(ctx, cl, design, researchContext, conventions, tools, handler)
+func Code(ctx context.Context, cl *inference.Client, model, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
+	r, err := CodeWithUsage(ctx, cl, model, design, researchContext, conventions, tools, handler)
 	return r.Content, err
 }
 
 // CodeWithUsage works like Code but also returns token usage.
-func CodeWithUsage(ctx context.Context, cl *inference.Client, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (CodeResult, error) {
+func CodeWithUsage(ctx context.Context, cl *inference.Client, model, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (CodeResult, error) {
 	userPrompt := fmt.Sprintf("## Technical Design\n\n%s", design)
 	if conventions != "" {
 		userPrompt += fmt.Sprintf("\n\n## Project Conventions\n\nFollow these conventions strictly:\n\n%s", conventions)
@@ -60,7 +58,7 @@ func CodeWithUsage(ctx context.Context, cl *inference.Client, design, researchCo
 
 	temp := float64(0)
 	req := inference.ChatRequest{
-		Model: coderModel,
+		Model: model,
 		Messages: []inference.Message{
 			{Role: "system", Content: coderSystemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -89,6 +87,6 @@ func CodeWithUsage(ctx context.Context, cl *inference.Client, design, researchCo
 		PromptTokens: resp.Usage.PromptTokens,
 		CompTokens:   resp.Usage.CompletionTokens,
 		ToolCalls:    resp.Usage.ToolCallCount,
-		Model:        coderModel,
+		Model:        model,
 	}, nil
 }
