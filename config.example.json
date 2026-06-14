@@ -1,6 +1,6 @@
 {
   "inference": {
-    "base_url": "http://ollama.ai.svc.cluster.local:11434/v1",
+    "base_url": "http://localhost:11434/v1",
     "model": "qwen2.5-coder:14b"
   },
   "poll_interval": "30s",
@@ -33,16 +33,10 @@
   },
   "repos": [
     {
-      "owner": "ruromero",
-      "repo": "la-fabriquilla",
+      "owner": "your-org",
+      "repo": "your-repo",
       "app_id": 123456,
       "installation_id": 789012
-    },
-    {
-      "owner": "ruromero",
-      "repo": "bunko.sh",
-      "app_id": 123456,
-      "installation_id": 789013
     }
   ]
 }
