@@ -1,0 +1,15 @@
+{
+  "name": "designer-respects-stdlib-constraint",
+  "phase": "designer",
+  "inputs": {
+    "plan": "PLAN:\n1. Add structured JSON request logging middleware to the dashboard HTTP server (new file)\n2. Log method, path, status, duration for each request",
+    "research_context": "",
+    "conventions": "Zero external Go dependencies - stdlib only (net/http, encoding/json, log/slog). No web frameworks."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "net/http"},
+    {"type": "output_not_contains", "value": "gin"},
+    {"type": "output_not_contains", "value": "chi"}
+  ],
+  "pass_threshold": "8/10"
+}
