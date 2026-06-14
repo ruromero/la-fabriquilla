@@ -1,6 +1,7 @@
 {
   "inference": {
-    "base_url": "http://ollama.ai.svc.cluster.local:11434/v1"
+    "base_url": "http://ollama.ai.svc.cluster.local:11434/v1",
+    "model": "qwen2.5-coder:14b"
   },
   "poll_interval": "30s",
   "max_iterations": 3,
@@ -23,6 +24,12 @@
     "enabled": false,
     "policy_dir": "/etc/fabriquilla/sandbox-policies",
     "image": "factory-go:latest"
+  },
+  "eval": {
+    "cases_dir": "tests/golden",
+    "runs_per_case": 0,
+    "timeout_per_run": "5m",
+    "results_dir": "eval-results"
   },
   "repos": [
     {

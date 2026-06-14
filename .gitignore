@@ -33,6 +33,9 @@ bin/
 # Design specs (local-only)
 docs/superpowers/
 
+# Eval results history (CI uploads as artifact)
+eval-results/
+
 # Editor/IDE
 # .idea/
 # .vscode/
