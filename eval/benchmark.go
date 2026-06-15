@@ -22,16 +22,7 @@ func WriteBenchmark(dir, phase, sha string, models []string, results map[string]
 	}
 
 	now := time.Now().UTC()
-	filename := now.Format("2006-01-02T150405.000") + ".md"
-	path := filepath.Join(dir, filename)
-	// Avoid collision if multiple runs start within the same millisecond.
-	for i := 1; ; i++ {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			break
-		}
-		filename = now.Format("2006-01-02T150405.000") + fmt.Sprintf("-%d", i) + ".md"
-		path = filepath.Join(dir, filename)
-	}
+	base := now.Format("2006-01-02T150405")
 
 	runsPerCase := 0
 	if len(models) > 0 && len(results[models[0]]) > 0 {
@@ -64,8 +55,28 @@ func WriteBenchmark(dir, phase, sha string, models []string, results map[string]
 		report,
 	)
 
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	// Atomically create the file; retry with a numeric suffix on collision.
+	// O_EXCL guarantees no TOCTOU race between concurrent eval-runner processes.
+	filename := base + ".md"
+	var f *os.File
+	for i := 1; ; i++ {
+		var openErr error
+		f, openErr = os.OpenFile(filepath.Join(dir, filename), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if openErr == nil {
+			break
+		}
+		if !os.IsExist(openErr) {
+			return "", fmt.Errorf("create benchmark file: %w", openErr)
+		}
+		filename = fmt.Sprintf("%s-%d.md", base, i)
+	}
+	path := filepath.Join(dir, filename)
+	if _, err := f.WriteString(content); err != nil {
+		f.Close()
 		return "", fmt.Errorf("write benchmark file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("close benchmark file: %w", err)
 	}
 
 	if err := rebuildBenchmarkIndex(dir); err != nil {
