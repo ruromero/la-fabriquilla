@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,14 +36,14 @@ func WriteBenchmark(dir, phase, sha string, models []string, results map[string]
 	}
 	modelsCSV := strings.Join(models, ",")
 
-	meta := fmt.Sprintf("%s date=%s models=%s phase=%s sha=%s runs=%d -->",
-		benchmarkMetaPrefix,
-		now.Format(time.RFC3339),
-		modelsCSV,
-		phaseLabel,
-		sha,
-		runsPerCase,
-	)
+	metaJSON, _ := json.Marshal(map[string]any{
+		"date":   now.Format(time.RFC3339),
+		"models": modelsCSV,
+		"phase":  phaseLabel,
+		"sha":    sha,
+		"runs":   runsPerCase,
+	})
+	meta := fmt.Sprintf("%s %s -->", benchmarkMetaPrefix, string(metaJSON))
 
 	content := fmt.Sprintf(
 		"%s\n# Model Comparison — %s UTC\n\n**Models:** %s  \n**Phase:** %s  \n**Runs per case:** %d  \n**SHA:** %s\n\n```\n%s```\n",
@@ -143,16 +144,18 @@ func rebuildBenchmarkIndex(dir string) error {
 }
 
 // parseBenchmarkMeta parses the structured metadata comment at the top of a
-// benchmark file: <!-- benchmark: key=value key=value -->
+// benchmark file: <!-- benchmark: {"key":"value",...} -->
 func parseBenchmarkMeta(line string) map[string]string {
 	line = strings.TrimPrefix(line, benchmarkMetaPrefix)
 	line = strings.TrimSuffix(strings.TrimSpace(line), "-->")
-	result := make(map[string]string)
-	for _, kv := range strings.Fields(strings.TrimSpace(line)) {
-		k, v, ok := strings.Cut(kv, "=")
-		if ok {
-			result[k] = v
-		}
+	line = strings.TrimSpace(line)
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		return nil
+	}
+	result := make(map[string]string, len(raw))
+	for k, v := range raw {
+		result[k] = fmt.Sprintf("%v", v)
 	}
 	return result
 }

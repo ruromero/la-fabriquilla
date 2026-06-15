@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -41,8 +42,18 @@ func main() {
 	timeout := flag.Duration("timeout", 0, "per-run timeout (default from config)")
 	resultsDir := flag.String("results", "", "results dir (default from config)")
 	benchmarkDir := flag.String("benchmark-dir", "docs/benchmarks", "directory to write model comparison reports (used with -models)")
+	noBenchmark := flag.Bool("no-benchmark", false, "skip writing benchmark report to -benchmark-dir (useful for quick smoke tests)")
 	compare := flag.Bool("compare", false, "print comparison table from results history and exit")
 	flag.Parse()
+
+	if *benchmarkDir != "" {
+		abs, err := filepath.Abs(*benchmarkDir)
+		if err != nil {
+			slog.Error("resolve benchmark dir", "error", err)
+			os.Exit(1)
+		}
+		*benchmarkDir = abs
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	slog.SetDefault(logger)
@@ -153,7 +164,7 @@ func main() {
 		report := eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped)
 		fmt.Print(report)
 
-		if *benchmarkDir != "" {
+		if *benchmarkDir != "" && !*noBenchmark {
 			path, err := eval.WriteBenchmark(*benchmarkDir, *phaseFilter, sha, modelList, matrixResults, report)
 			if err != nil {
 				slog.Warn("write benchmark file", "error", err)

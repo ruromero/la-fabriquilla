@@ -38,7 +38,7 @@ func TestWriteBenchmark(t *testing.T) {
 		"model-a,model-b",
 		"planner,coder",
 		"abc1234",
-		"runs=10",
+		`"runs":10`,
 		"# Model Comparison",
 		"Model Comparison Report",
 	} {
@@ -79,8 +79,8 @@ func TestWriteBenchmarkEmptyPhase(t *testing.T) {
 	}
 	// The metadata comment in the benchmark file uses "all" for an empty phase.
 	data, _ := os.ReadFile(path)
-	if !strings.Contains(string(data), "phase=all") {
-		t.Error("expected phase=all in benchmark file when empty phase passed")
+	if !strings.Contains(string(data), `"phase":"all"`) {
+		t.Error(`expected "phase":"all" in benchmark file when empty phase passed`)
 	}
 }
 
@@ -106,7 +106,7 @@ func TestRebuildBenchmarkIndexMultipleRuns(t *testing.T) {
 }
 
 func TestParseBenchmarkMeta(t *testing.T) {
-	line := `<!-- benchmark: date=2026-06-15T14:30:00Z models=a,b phase=all sha=abc runs=10 -->`
+	line := `<!-- benchmark: {"date":"2026-06-15T14:30:00Z","models":"a,b","phase":"all","sha":"abc","runs":10} -->`
 	m := parseBenchmarkMeta(line)
 	checks := map[string]string{
 		"date":   "2026-06-15T14:30:00Z",

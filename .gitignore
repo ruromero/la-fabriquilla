@@ -39,6 +39,9 @@ docs/superpowers/
 # Eval results history (CI uploads as artifact)
 eval-results/
 
+# Benchmark index (generated on each WriteBenchmark call — not source)
+docs/benchmarks/README.md
+
 # Editor/IDE
 # .idea/
 # .vscode/
