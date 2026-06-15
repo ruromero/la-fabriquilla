@@ -41,7 +41,6 @@ func WriteBenchmark(dir, phase, sha string, models []string, results map[string]
 		"models": modelsCSV,
 		"phase":  phaseLabel,
 		"sha":    sha,
-		"runs":   runsPerCase,
 	})
 	meta := fmt.Sprintf("%s %s -->", benchmarkMetaPrefix, string(metaJSON))
 
@@ -99,7 +98,6 @@ func rebuildBenchmarkIndex(dir string) error {
 		date   string
 		models string
 		phase  string
-		runs   string
 		sha    string
 	}
 
@@ -122,7 +120,6 @@ func rebuildBenchmarkIndex(dir string) error {
 			date:   m["date"],
 			models: m["models"],
 			phase:  m["phase"],
-			runs:   m["runs"],
 			sha:    m["sha"],
 		})
 	}
@@ -132,11 +129,11 @@ func rebuildBenchmarkIndex(dir string) error {
 	if len(rows) == 0 {
 		b.WriteString("No benchmark runs yet.\n")
 	} else {
-		b.WriteString("| Date (UTC) | Models | Phase | Runs | SHA | Report |\n")
-		b.WriteString("|------------|--------|-------|------|-----|--------|\n")
+		b.WriteString("| Date (UTC) | Models | Phase | SHA | Report |\n")
+		b.WriteString("|------------|--------|-------|-----|--------|\n")
 		for _, r := range rows {
-			b.WriteString(fmt.Sprintf("| %s | `%s` | %s | %s | %s | [view](%s) |\n",
-				r.date, r.models, r.phase, r.runs, r.sha, r.file))
+			b.WriteString(fmt.Sprintf("| %s | `%s` | %s | %s | [view](%s) |\n",
+				r.date, r.models, r.phase, r.sha, r.file))
 		}
 	}
 
