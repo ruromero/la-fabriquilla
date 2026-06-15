@@ -95,13 +95,6 @@ func StructuredOutput(schema any) *ResponseFormat {
 	}
 }
 
-// JSONOutput requests JSON output without a schema — compatible with all
-// OpenAI-compatible endpoints including DeepSeek (which does not support
-// json_schema). The caller is responsible for parsing and validating the
-// returned JSON.
-func JSONOutput() *ResponseFormat {
-	return &ResponseFormat{Type: "json_object"}
-}
 
 type ChatResponse struct {
 	Choices []Choice `json:"choices"`
