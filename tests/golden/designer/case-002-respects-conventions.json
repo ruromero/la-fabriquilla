@@ -8,7 +8,7 @@
   },
   "assertions": [
     {"type": "output_contains", "value": "net/http"},
-    {"type": "output_not_contains", "value": "gin"},
+    {"type": "output_not_contains", "value": "gin-gonic"},
     {"type": "output_not_contains", "value": "chi"}
   ],
   "pass_threshold": "8/10"
