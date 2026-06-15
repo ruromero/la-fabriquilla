@@ -28,13 +28,16 @@ type Assertion struct {
 
 // RunResult captures the outcome of running a test case multiple times.
 type RunResult struct {
-	Case      string   `json:"case"`
-	Runs      int      `json:"runs"`
-	Passes    int      `json:"passes"`
-	Threshold int      `json:"threshold"`
-	TotalRuns int      `json:"total_runs"`
-	Pass      bool     `json:"pass"`
-	Failures  []string `json:"failures,omitempty"`
+	Case         string   `json:"case"`
+	Runs         int      `json:"runs"`
+	Passes       int      `json:"passes"`
+	Threshold    int      `json:"threshold"`
+	TotalRuns    int      `json:"total_runs"`
+	Pass         bool     `json:"pass"`
+	Failures     []string `json:"failures,omitempty"`
+	WallSecs     float64  `json:"wall_secs,omitempty"`
+	PromptTokens int      `json:"prompt_tokens,omitempty"`
+	CompTokens   int      `json:"comp_tokens,omitempty"`
 }
 
 // FileState represents a file produced by an agent run.

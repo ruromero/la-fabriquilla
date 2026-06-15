@@ -64,9 +64,11 @@ type SecurityConfig struct {
 }
 
 type ArbiterConfig struct {
-	BaseURL string `json:"base_url"`
-	Model   string `json:"model"`
-	APIKey  string `json:"-"`
+	BaseURL              string  `json:"base_url"`
+	Model                string  `json:"model"`
+	APIKey               string  `json:"-"`
+	InputPricePerMToken  float64 `json:"input_price_per_million_tokens,omitempty"`
+	OutputPricePerMToken float64 `json:"output_price_per_million_tokens,omitempty"`
 }
 
 func (a ArbiterConfig) Enabled() bool {

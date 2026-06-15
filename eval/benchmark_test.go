@@ -20,7 +20,7 @@ func TestWriteBenchmark(t *testing.T) {
 			{Case: "coder/case-001", Runs: 10, Passes: 10, Pass: true},
 		},
 	}
-	report := FormatModelMatrix(models, results, nil)
+	report := FormatModelMatrix(models, results, nil, nil)
 
 	path, err := WriteBenchmark(dir, "planner,coder", "abc1234", models, results, report)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestWriteBenchmarkEmptyPhase(t *testing.T) {
 	results := map[string][]RunResult{
 		"model-a": {{Case: "planner/case-001", Runs: 5, Passes: 5, Pass: true}},
 	}
-	report := FormatModelMatrix(models, results, nil)
+	report := FormatModelMatrix(models, results, nil, nil)
 	path, err := WriteBenchmark(dir, "", "sha123", models, results, report)
 	if err != nil {
 		t.Fatalf("WriteBenchmark: %v", err)
@@ -89,7 +89,7 @@ func TestRebuildBenchmarkIndexMultipleRuns(t *testing.T) {
 	results := map[string][]RunResult{
 		"m": {{Case: "c", Runs: 3, Passes: 3, Pass: true}},
 	}
-	report := FormatModelMatrix(models, results, nil)
+	report := FormatModelMatrix(models, results, nil, nil)
 
 	if _, err := WriteBenchmark(dir, "coder", "sha1", models, results, report); err != nil {
 		t.Fatal(err)

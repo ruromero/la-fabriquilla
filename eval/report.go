@@ -9,8 +9,9 @@ import (
 // multiple models. models gives the column order. results maps model name to
 // run results for that model. skipped lists phase/case names skipped for all
 // models (same across models since skip logic depends on adapter config, not
-// model name).
-func FormatModelMatrix(models []string, results map[string][]RunResult, skipped []string) string {
+// model name). pricing maps model name to [inputPricePerM, outputPricePerM]
+// in USD; omit a model or pass nil to skip cost display for that model.
+func FormatModelMatrix(models []string, results map[string][]RunResult, skipped []string, pricing map[string][2]float64) string {
 	if len(models) == 0 {
 		return ""
 	}
@@ -89,23 +90,44 @@ func FormatModelMatrix(models []string, results map[string][]RunResult, skipped 
 		b.WriteString("\n")
 	}
 
-	// Summary: cases passed + avg pass rate across all runs.
+	// Summary: cases passed, avg pass rate, avg wall time, tokens, cost.
 	b.WriteString("\nSummary\n-------\n")
 	for _, m := range models {
 		casesPassed, totalCases := 0, len(results[m])
 		totalPasses, totalRuns := 0, 0
+		totalWall := 0.0
+		totalPrompt, totalComp := 0, 0
 		for _, r := range results[m] {
 			if r.Pass {
 				casesPassed++
 			}
 			totalPasses += r.Passes
 			totalRuns += r.Runs
+			totalWall += r.WallSecs
+			totalPrompt += r.PromptTokens
+			totalComp += r.CompTokens
 		}
 		rate := 0.0
 		if totalRuns > 0 {
 			rate = float64(totalPasses) / float64(totalRuns) * 100
 		}
-		b.WriteString(fmt.Sprintf("%-25s %d/%d cases  avg %.0f%% pass rate\n", m, casesPassed, totalCases, rate))
+		avgWall := 0.0
+		if totalCases > 0 {
+			avgWall = totalWall / float64(totalCases)
+		}
+		totalTok := totalPrompt + totalComp
+		line := fmt.Sprintf("%-25s %d/%d cases  avg %.0f%% pass rate", m, casesPassed, totalCases, rate)
+		if totalWall > 0 {
+			line += fmt.Sprintf("  avg %.0fs/case", avgWall)
+		}
+		if totalTok > 0 {
+			line += fmt.Sprintf("  %.1fK tok", float64(totalTok)/1000)
+		}
+		if p, ok := pricing[m]; ok && (p[0] > 0 || p[1] > 0) {
+			cost := float64(totalPrompt)/1_000_000*p[0] + float64(totalComp)/1_000_000*p[1]
+			line += fmt.Sprintf("  $%.4f", cost)
+		}
+		b.WriteString(line + "\n")
 	}
 	return b.String()
 }

@@ -329,7 +329,7 @@ func TestFormatModelMatrix(t *testing.T) {
 	}
 	skipped := []string{"reviewer/reviewer-approves-clean-code"}
 
-	out := FormatModelMatrix(models, results, skipped)
+	out := FormatModelMatrix(models, results, skipped, nil)
 	for _, want := range []string{
 		"Model Comparison Report",
 		"model-a", "model-b",
@@ -352,7 +352,7 @@ func TestFormatModelMatrix(t *testing.T) {
 }
 
 func TestFormatModelMatrixEmpty(t *testing.T) {
-	if got := FormatModelMatrix(nil, nil, nil); got != "" {
+	if got := FormatModelMatrix(nil, nil, nil, nil); got != "" {
 		t.Errorf("expected empty string for nil models, got %q", got)
 	}
 }

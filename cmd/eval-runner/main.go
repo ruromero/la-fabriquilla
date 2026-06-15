@@ -102,28 +102,35 @@ func main() {
 	sha := gitSHA()
 
 	if *modelsFlag != "" {
-		modelList, err := splitModels(*modelsFlag)
+		specs, err := splitModels(*modelsFlag, cfg)
 		if err != nil {
 			slog.Error("invalid -models flag", "error", err)
 			os.Exit(1)
 		}
-		if len(modelList) == 0 {
+		if len(specs) == 0 {
 			slog.Error("no models parsed from -models flag")
 			os.Exit(1)
 		}
 
-		matrixResults := make(map[string][]eval.RunResult, len(modelList))
+		modelList := make([]string, len(specs))
+		for i, s := range specs {
+			modelList[i] = s.name
+		}
+
+		matrixResults := make(map[string][]eval.RunResult, len(specs))
 		var matrixSkipped []string
 
-		for _, m := range modelList {
-			if err := preflightOllama(cfg.Inference.BaseURL, m); err != nil {
-				slog.Error("preflight failed", "model", m, "error", err)
-				os.Exit(1)
+		for _, spec := range specs {
+			if spec.baseURL == cfg.Inference.BaseURL {
+				if err := preflightOllama(cfg.Inference.BaseURL, spec.name); err != nil {
+					slog.Error("preflight failed", "model", spec.name, "error", err)
+					os.Exit(1)
+				}
 			}
 
 			a := &adapters{
-				agentClient: inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey)),
-				agentModel:  m,
+				agentClient: inference.NewClient(spec.baseURL, inference.WithAPIKey(spec.apiKey)),
+				agentModel:  spec.name,
 				timeout:     cfg.Eval.TimeoutPerRun.Duration,
 			}
 			if *timeout > 0 {
@@ -135,15 +142,15 @@ func main() {
 			}
 			if arbURL != "" {
 				a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
-				a.arbModel = m
+				a.arbModel = spec.name
 			}
 
 			results, skipped, err := runCases(a, cases, *runs, cfg, dir, sha)
 			if err != nil {
-				slog.Error("run cases", "model", m, "error", err)
+				slog.Error("run cases", "model", spec.name, "error", err)
 				os.Exit(1)
 			}
-			matrixResults[m] = results
+			matrixResults[spec.name] = results
 			if len(matrixSkipped) == 0 {
 				matrixSkipped = skipped
 			}
@@ -161,7 +168,14 @@ func main() {
 			os.Exit(1)
 		}
 
-		report := eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped)
+		pricing := make(map[string][2]float64, len(specs))
+		for _, spec := range specs {
+			if spec.inputPricePerM > 0 || spec.outputPricePerM > 0 {
+				pricing[spec.name] = [2]float64{spec.inputPricePerM, spec.outputPricePerM}
+			}
+		}
+
+		report := eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped, pricing)
 		fmt.Print(report)
 
 		if *benchmarkDir != "" && !*noBenchmark {
@@ -276,6 +290,9 @@ func runCases(a *adapters, cases []eval.TestCase, runsOverride int, cfg config.C
 		}
 		wall := time.Since(start)
 		prompt, comp := a.takeUsage()
+		result.WallSecs = wall.Seconds()
+		result.PromptTokens = prompt
+		result.CompTokens = comp
 		results = append(results, result)
 
 		rec := eval.Record{
@@ -323,17 +340,51 @@ func filterCases(cases []eval.TestCase, phases, nameSubstr string) []eval.TestCa
 	return out
 }
 
-func splitModels(s string) ([]string, error) {
+// modelSpec holds per-model endpoint and pricing configuration parsed from
+// the -models flag. Use "name@arbiter" to route a model through the arbiter
+// endpoint defined in config (useful for comparing local vs API models).
+type modelSpec struct {
+	name            string
+	baseURL         string
+	apiKey          string
+	inputPricePerM  float64 // USD per million input tokens; 0 = free/unknown
+	outputPricePerM float64 // USD per million output tokens
+}
+
+func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 	seen := make(map[string]bool)
-	var out []string
-	for _, m := range strings.Split(s, ",") {
-		if m = strings.TrimSpace(m); m != "" {
-			if seen[m] {
-				return nil, fmt.Errorf("duplicate model %q in -models flag", m)
-			}
-			seen[m] = true
-			out = append(out, m)
+	var out []modelSpec
+	for _, token := range strings.Split(s, ",") {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
 		}
+		name, endpoint, hasEndpoint := strings.Cut(token, "@")
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil, fmt.Errorf("empty model name in -models flag")
+		}
+		if seen[name] {
+			return nil, fmt.Errorf("duplicate model %q in -models flag", name)
+		}
+		seen[name] = true
+
+		spec := modelSpec{name: name, baseURL: cfg.Inference.BaseURL, apiKey: cfg.Inference.APIKey}
+		if hasEndpoint {
+			switch endpoint {
+			case "arbiter":
+				if cfg.Arbiter.BaseURL == "" {
+					return nil, fmt.Errorf("model %q uses @arbiter but arbiter.base_url is not configured", name)
+				}
+				spec.baseURL = cfg.Arbiter.BaseURL
+				spec.apiKey = cfg.Arbiter.APIKey
+				spec.inputPricePerM = cfg.Arbiter.InputPricePerMToken
+				spec.outputPricePerM = cfg.Arbiter.OutputPricePerMToken
+			default:
+				return nil, fmt.Errorf("unknown endpoint %q for model %q (only 'arbiter' is supported)", endpoint, name)
+			}
+		}
+		out = append(out, spec)
 	}
 	return out, nil
 }
