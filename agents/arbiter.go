@@ -70,8 +70,7 @@ func Arbitrate(ctx context.Context, cl *inference.Client, model string,
 			{Role: "system", Content: arbiterSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature:    &temp,
-		ResponseFormat: inference.JSONOutput(),
+		Temperature: &temp,
 	})
 	if err != nil {
 		return ArbiterOutput{}, fmt.Errorf("arbiter chat: %w", err)
