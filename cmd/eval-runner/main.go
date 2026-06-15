@@ -40,6 +40,7 @@ func main() {
 	runs := flag.Int("runs", -1, "runs per case (-1 = config, 0 = threshold denominator)")
 	timeout := flag.Duration("timeout", 0, "per-run timeout (default from config)")
 	resultsDir := flag.String("results", "", "results dir (default from config)")
+	benchmarkDir := flag.String("benchmark-dir", "docs/benchmarks", "directory to write model comparison reports (used with -models)")
 	compare := flag.Bool("compare", false, "print comparison table from results history and exit")
 	flag.Parse()
 
@@ -149,7 +150,17 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Print(eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped))
+		report := eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped)
+		fmt.Print(report)
+
+		if *benchmarkDir != "" {
+			path, err := eval.WriteBenchmark(*benchmarkDir, *phaseFilter, sha, modelList, matrixResults, report)
+			if err != nil {
+				slog.Warn("write benchmark file", "error", err)
+			} else {
+				slog.Info("benchmark written", "path", path)
+			}
+		}
 
 		for _, modelRuns := range matrixResults {
 			for _, r := range modelRuns {
