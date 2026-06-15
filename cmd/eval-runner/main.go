@@ -90,7 +90,11 @@ func main() {
 	sha := gitSHA()
 
 	if *modelsFlag != "" {
-		modelList := splitModels(*modelsFlag)
+		modelList, err := splitModels(*modelsFlag)
+		if err != nil {
+			slog.Error("invalid -models flag", "error", err)
+			os.Exit(1)
+		}
 		if len(modelList) == 0 {
 			slog.Error("no models parsed from -models flag")
 			os.Exit(1)
@@ -131,6 +135,18 @@ func main() {
 			if len(matrixSkipped) == 0 {
 				matrixSkipped = skipped
 			}
+		}
+
+		anyRan := false
+		for _, modelRuns := range matrixResults {
+			if len(modelRuns) > 0 {
+				anyRan = true
+				break
+			}
+		}
+		if !anyRan && len(matrixSkipped) > 0 {
+			slog.Error("all matched cases were skipped; check -phase filter and arbiter config", "skipped", matrixSkipped)
+			os.Exit(1)
 		}
 
 		fmt.Print(eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped))
@@ -285,14 +301,19 @@ func filterCases(cases []eval.TestCase, phases, nameSubstr string) []eval.TestCa
 	return out
 }
 
-func splitModels(s string) []string {
+func splitModels(s string) ([]string, error) {
+	seen := make(map[string]bool)
 	var out []string
 	for _, m := range strings.Split(s, ",") {
 		if m = strings.TrimSpace(m); m != "" {
+			if seen[m] {
+				return nil, fmt.Errorf("duplicate model %q in -models flag", m)
+			}
+			seen[m] = true
 			out = append(out, m)
 		}
 	}
-	return out
+	return out, nil
 }
 
 func defaultConfigPath() string {
