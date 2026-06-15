@@ -340,8 +340,10 @@ func TestFormatModelMatrix(t *testing.T) {
 		"SKIPPED",
 		"reviewer/reviewer-approves-clean-code",
 		"Summary",
-		"1/2 passed",
-		"2/2 passed",
+		"1/2 cases",
+		"2/2 cases",
+		"75%",  // model-a: 15/20 runs pass (10+5)/(10+10)
+		"100%", // model-b: 20/20 runs pass
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("FormatModelMatrix missing %q", want)

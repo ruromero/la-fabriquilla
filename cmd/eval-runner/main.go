@@ -34,7 +34,7 @@ func main() {
 	phaseFilter := flag.String("phase", "", "comma-separated phase filter")
 	caseFilter := flag.String("case", "", "substring filter on case name")
 	model := flag.String("model", "", "agent model override")
-	modelsFlag := flag.String("models", "", "comma-separated list of models to compare side-by-side")
+	modelsFlag := flag.String("models", "", "comma-separated models to compare side-by-side (use -runs 10+ for statistical reliability)")
 	arbBaseURL := flag.String("arbiter-base-url", "", "arbiter endpoint override")
 	arbModel := flag.String("arbiter-model", "", "arbiter model override")
 	runs := flag.Int("runs", -1, "runs per case (-1 = config, 0 = threshold denominator)")

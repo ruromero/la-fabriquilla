@@ -31,15 +31,22 @@ func FormatModelMatrix(models []string, results map[string][]RunResult, skipped 
 		}
 	}
 
-	// Column width = max(modelName, len("PASS (10/10)")) = max(len(m), 12).
+	// Column width = max(modelName, widest cell seen in data).
 	const caseWidth = 45
-	const minColWidth = 12 // "PASS (10/10)" is 12 chars
+	maxCellLen := len("SKIPPED") // minimum floor
+	for _, m := range models {
+		for _, r := range results[m] {
+			if w := len(fmt.Sprintf("PASS (%d/%d)", r.Runs, r.Runs)); w > maxCellLen {
+				maxCellLen = w
+			}
+		}
+	}
 	colW := make([]int, len(models))
 	for i, m := range models {
-		if w := len(m); w > minColWidth {
+		if w := len(m); w > maxCellLen {
 			colW[i] = w
 		} else {
-			colW[i] = minColWidth
+			colW[i] = maxCellLen
 		}
 	}
 
@@ -82,16 +89,23 @@ func FormatModelMatrix(models []string, results map[string][]RunResult, skipped 
 		b.WriteString("\n")
 	}
 
-	// Summary.
+	// Summary: cases passed + avg pass rate across all runs.
 	b.WriteString("\nSummary\n-------\n")
 	for _, m := range models {
-		passed, total := 0, len(results[m])
+		casesPassed, totalCases := 0, len(results[m])
+		totalPasses, totalRuns := 0, 0
 		for _, r := range results[m] {
 			if r.Pass {
-				passed++
+				casesPassed++
 			}
+			totalPasses += r.Passes
+			totalRuns += r.Runs
 		}
-		b.WriteString(fmt.Sprintf("%-25s %d/%d passed\n", m, passed, total))
+		rate := 0.0
+		if totalRuns > 0 {
+			rate = float64(totalPasses) / float64(totalRuns) * 100
+		}
+		b.WriteString(fmt.Sprintf("%-25s %d/%d cases  avg %.0f%% pass rate\n", m, casesPassed, totalCases, rate))
 	}
 	return b.String()
 }
