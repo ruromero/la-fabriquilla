@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/review"
@@ -70,14 +71,13 @@ func Arbitrate(ctx context.Context, cl *inference.Client, model string,
 			{Role: "system", Content: arbiterSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature:    &temp,
-		ResponseFormat: inference.StructuredOutput(arbiterOutputSchema),
+		Temperature: &temp,
 	})
 	if err != nil {
 		return ArbiterOutput{}, fmt.Errorf("arbiter chat: %w", err)
 	}
 
-	result, err := parseArbiterResponse(resp.Choices[0].Message.Content)
+	result, err := parseArbiterResponse(stripJSONFences(resp.Choices[0].Message.Content))
 	if err != nil {
 		return ArbiterOutput{}, fmt.Errorf("parse arbiter response: %w", err)
 	}
@@ -148,6 +148,22 @@ func filterDismissedFindings(findings []review.ReviewFinding, dismissedKeys []st
 		}
 	}
 	return remaining, autoDismissed
+}
+
+// stripJSONFences removes leading markdown code fences (```json or ```) and
+// trailing ``` that some models add around JSON output when no response_format
+// is enforced. Returns content unchanged if no fences are present.
+func stripJSONFences(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+	if idx := strings.IndexByte(s, '\n'); idx != -1 {
+		s = s[idx+1:]
+	}
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "```")
+	return strings.TrimSpace(s)
 }
 
 func parseArbiterResponse(content string) (review.ArbiterResult, error) {

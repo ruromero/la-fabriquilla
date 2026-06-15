@@ -146,7 +146,7 @@ func LoadConfig(path string) (Config, error) {
 	}
 
 	cfg := Config{
-		Inference:        InferenceConfig{BaseURL: "http://ollama.ai.svc.cluster.local:11434/v1"},
+		Inference:        InferenceConfig{BaseURL: "http://localhost:11434/v1"},
 		PollInterval:     Duration{30 * time.Second},
 		MaxIterations:    3,
 		MaxCostBudget:    100000,
@@ -244,18 +244,39 @@ func LoadConfig(path string) (Config, error) {
 		return Config{}, fmt.Errorf("arbiter.model is required when arbiter.base_url is set")
 	}
 
-	if len(cfg.Repos) == 0 {
-		return Config{}, fmt.Errorf("no repos configured")
-	}
-
-	for i, r := range cfg.Repos {
-		if r.Owner == "" || r.Repo == "" {
-			return Config{}, fmt.Errorf("repo %d: owner and repo are required", i)
-		}
-		if !r.UsesAppAuth() && r.Token == "" {
-			return Config{}, fmt.Errorf("repo %d: either token or app auth (app_id, private_key_path, installation_id) required", i)
-		}
-	}
-
 	return cfg, nil
+}
+
+// ValidateRepos checks that at least one repo is configured and that every
+// repo has valid auth. Called by the dispatcher; other binaries (eval-runner,
+// phase agents) do not require repos.
+//
+// A repo is considered authenticated if any of the following is true:
+//   - r.Token is set
+//   - r.UsesAppAuth() (repo-level app_id + private_key_path + installation_id)
+//   - cfg.Apps["dispatcher"] has AppID and a PrivateKeyPath (from the app or
+//     the repo entry), and an InstallationID (from the app or the repo entry)
+func (c Config) ValidateRepos() error {
+	if len(c.Repos) == 0 {
+		return fmt.Errorf("no repos configured")
+	}
+	dispApp := c.Apps["dispatcher"]
+	dispHasKey := dispApp.AppID != 0 && dispApp.PrivateKeyPath != ""
+	for i, r := range c.Repos {
+		if r.Owner == "" || r.Repo == "" {
+			return fmt.Errorf("repo %d: owner and repo are required", i)
+		}
+		if r.Token != "" || r.UsesAppAuth() {
+			continue
+		}
+		// Accept shared dispatcher app auth: AppID + key path (app or repo) +
+		// installation ID (app or repo), mirroring NewGitHubClientForApp logic.
+		hasKey := dispHasKey || (dispApp.AppID != 0 && r.PrivateKeyPath != "")
+		hasInstall := dispApp.InstallationID != 0 || r.InstallationID != 0
+		if hasKey && hasInstall {
+			continue
+		}
+		return fmt.Errorf("repo %d (%s/%s): requires token, per-repo app auth, or apps.dispatcher with app_id, private_key_path, and installation_id", i, r.Owner, r.Repo)
+	}
+	return nil
 }
