@@ -371,8 +371,12 @@ func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 
 		spec := modelSpec{name: name, baseURL: cfg.Inference.BaseURL, apiKey: cfg.Inference.APIKey}
 		if hasEndpoint {
-			switch endpoint {
-			case "arbiter":
+			if ep, ok := cfg.Endpoints[endpoint]; ok {
+				spec.baseURL = ep.BaseURL
+				spec.apiKey = ep.APIKey
+				spec.inputPricePerM = ep.InputPricePerMToken
+				spec.outputPricePerM = ep.OutputPricePerMToken
+			} else if endpoint == "arbiter" {
 				if cfg.Arbiter.BaseURL == "" {
 					return nil, fmt.Errorf("model %q uses @arbiter but arbiter.base_url is not configured", name)
 				}
@@ -380,8 +384,8 @@ func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 				spec.apiKey = cfg.Arbiter.APIKey
 				spec.inputPricePerM = cfg.Arbiter.InputPricePerMToken
 				spec.outputPricePerM = cfg.Arbiter.OutputPricePerMToken
-			default:
-				return nil, fmt.Errorf("unknown endpoint %q for model %q (only 'arbiter' is supported)", endpoint, name)
+			} else {
+				return nil, fmt.Errorf("unknown endpoint %q for model %q; define it in config endpoints or use 'arbiter'", endpoint, name)
 			}
 		}
 		out = append(out, spec)

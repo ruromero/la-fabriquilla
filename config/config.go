@@ -14,29 +14,40 @@ type InferenceConfig struct {
 }
 
 type Config struct {
-	Inference        InferenceConfig      `json:"inference"`
-	GeminiAPIKey     string               `json:"gemini_api_key,omitempty"`
-	Planner          PlannerConfig        `json:"planner"`
-	PollInterval     Duration             `json:"poll_interval"`
-	MaxIterations    int                  `json:"max_iterations"`
-	MaxCostBudget    int                  `json:"max_cost_budget"`
-	MaxPhaseDuration Duration             `json:"max_phase_duration"`
-	MaxPhaseRetries  int                  `json:"max_phase_retries"`
-	PhaseDurations   map[string]Duration  `json:"phase_durations,omitempty"`
-	ShadowMode       bool                 `json:"shadow_mode"`
-	MaxFilesChanged  int                  `json:"max_files_changed"`
-	MaxPRSizeLines   int                  `json:"max_pr_size_lines"`
-	MaxIssuesPerHour int                  `json:"max_issues_per_hour"`
-	MaxIssuesPerDay  int                  `json:"max_issues_per_day"`
-	BlockedPaths     []string             `json:"blocked_paths,omitempty"`
-	Serena           SerenaConfig         `json:"serena"`
-	Sandbox          SandboxConfig        `json:"sandbox,omitempty"`
-	Security         SecurityConfig       `json:"security,omitempty"`
-	Arbiter          ArbiterConfig        `json:"arbiter,omitempty"`
-	Eval             EvalConfig           `json:"eval,omitempty"`
-	Repos            []RepoConfig         `json:"repos"`
-	Apps             map[string]AppConfig `json:"apps,omitempty"`
-	StateDir         string               `json:"state_dir,omitempty"`
+	Inference        InferenceConfig          `json:"inference"`
+	GeminiAPIKey     string                   `json:"gemini_api_key,omitempty"`
+	Planner          PlannerConfig            `json:"planner"`
+	PollInterval     Duration                 `json:"poll_interval"`
+	MaxIterations    int                      `json:"max_iterations"`
+	MaxCostBudget    int                      `json:"max_cost_budget"`
+	MaxPhaseDuration Duration                 `json:"max_phase_duration"`
+	MaxPhaseRetries  int                      `json:"max_phase_retries"`
+	PhaseDurations   map[string]Duration      `json:"phase_durations,omitempty"`
+	ShadowMode       bool                     `json:"shadow_mode"`
+	MaxFilesChanged  int                      `json:"max_files_changed"`
+	MaxPRSizeLines   int                      `json:"max_pr_size_lines"`
+	MaxIssuesPerHour int                      `json:"max_issues_per_hour"`
+	MaxIssuesPerDay  int                      `json:"max_issues_per_day"`
+	BlockedPaths     []string                 `json:"blocked_paths,omitempty"`
+	Serena           SerenaConfig             `json:"serena"`
+	Sandbox          SandboxConfig            `json:"sandbox,omitempty"`
+	Security         SecurityConfig           `json:"security,omitempty"`
+	Arbiter          ArbiterConfig            `json:"arbiter,omitempty"`
+	Endpoints        map[string]EndpointConfig `json:"endpoints,omitempty"`
+	Eval             EvalConfig               `json:"eval,omitempty"`
+	Repos            []RepoConfig             `json:"repos"`
+	Apps             map[string]AppConfig     `json:"apps,omitempty"`
+	StateDir         string                   `json:"state_dir,omitempty"`
+}
+
+// EndpointConfig defines a named inference endpoint for use with
+// eval-runner's model@endpoint syntax.
+type EndpointConfig struct {
+	BaseURL              string  `json:"base_url"`
+	APIKeyEnv            string  `json:"api_key_env,omitempty"`
+	APIKey               string  `json:"-"`
+	InputPricePerMToken  float64 `json:"input_price_per_million_tokens,omitempty"`
+	OutputPricePerMToken float64 `json:"output_price_per_million_tokens,omitempty"`
 }
 
 // SandboxConfig holds settings for OpenShell sandbox execution.
@@ -195,6 +206,15 @@ func LoadConfig(path string) (Config, error) {
 
 	if v := os.Getenv("ARBITER_API_KEY"); v != "" {
 		cfg.Arbiter.APIKey = v
+	}
+
+	for name, ep := range cfg.Endpoints {
+		if ep.APIKeyEnv != "" {
+			if v := os.Getenv(ep.APIKeyEnv); v != "" {
+				ep.APIKey = v
+				cfg.Endpoints[name] = ep
+			}
+		}
 	}
 
 	if v := os.Getenv("PIPELINE_STATE_DIR"); v != "" {
