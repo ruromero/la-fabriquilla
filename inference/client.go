@@ -95,7 +95,6 @@ func StructuredOutput(schema any) *ResponseFormat {
 	}
 }
 
-
 type ChatResponse struct {
 	Choices []Choice `json:"choices"`
 	Usage   Usage    `json:"usage"`
