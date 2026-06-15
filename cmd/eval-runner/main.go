@@ -114,7 +114,7 @@ func main() {
 
 		modelList := make([]string, len(specs))
 		for i, s := range specs {
-			modelList[i] = s.name
+			modelList[i] = s.label
 		}
 
 		matrixResults := make(map[string][]eval.RunResult, len(specs))
@@ -123,7 +123,7 @@ func main() {
 		for _, spec := range specs {
 			if spec.baseURL == cfg.Inference.BaseURL {
 				if err := preflightOllama(cfg.Inference.BaseURL, spec.name); err != nil {
-					slog.Error("preflight failed", "model", spec.name, "error", err)
+					slog.Error("preflight failed", "model", spec.label, "error", err)
 					os.Exit(1)
 				}
 			}
@@ -147,10 +147,10 @@ func main() {
 
 			results, skipped, err := runCases(a, cases, *runs, cfg, dir, sha)
 			if err != nil {
-				slog.Error("run cases", "model", spec.name, "error", err)
+				slog.Error("run cases", "model", spec.label, "error", err)
 				os.Exit(1)
 			}
-			matrixResults[spec.name] = results
+			matrixResults[spec.label] = results
 			if len(matrixSkipped) == 0 {
 				matrixSkipped = skipped
 			}
@@ -171,7 +171,7 @@ func main() {
 		pricing := make(map[string][2]float64, len(specs))
 		for _, spec := range specs {
 			if spec.inputPricePerM > 0 || spec.outputPricePerM > 0 {
-				pricing[spec.name] = [2]float64{spec.inputPricePerM, spec.outputPricePerM}
+				pricing[spec.label] = [2]float64{spec.inputPricePerM, spec.outputPricePerM}
 			}
 		}
 
@@ -341,10 +341,13 @@ func filterCases(cases []eval.TestCase, phases, nameSubstr string) []eval.TestCa
 }
 
 // modelSpec holds per-model endpoint and pricing configuration parsed from
-// the -models flag. Use "name@arbiter" to route a model through the arbiter
+// the -models flag. Use "name@endpoint" to route a model through a named
 // endpoint defined in config (useful for comparing local vs API models).
+// label is the display/map key (includes @endpoint when present); name is
+// the bare model ID sent to the inference API.
 type modelSpec struct {
-	name            string
+	label           string  // display key: "name" or "name@endpoint"
+	name            string  // bare model ID for the API
 	baseURL         string
 	apiKey          string
 	inputPricePerM  float64 // USD per million input tokens; 0 = free/unknown
@@ -364,12 +367,17 @@ func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 		if name == "" {
 			return nil, fmt.Errorf("empty model name in -models flag")
 		}
-		if seen[name] {
-			return nil, fmt.Errorf("duplicate model %q in -models flag", name)
-		}
-		seen[name] = true
 
-		spec := modelSpec{name: name, baseURL: cfg.Inference.BaseURL, apiKey: cfg.Inference.APIKey}
+		label := name
+		if hasEndpoint {
+			label = name + "@" + endpoint
+		}
+		if seen[label] {
+			return nil, fmt.Errorf("duplicate model %q in -models flag", label)
+		}
+		seen[label] = true
+
+		spec := modelSpec{label: label, name: name, baseURL: cfg.Inference.BaseURL, apiKey: cfg.Inference.APIKey}
 		if hasEndpoint {
 			if ep, ok := cfg.Endpoints[endpoint]; ok {
 				spec.baseURL = ep.BaseURL
