@@ -5,6 +5,111 @@ import (
 	"strings"
 )
 
+// FormatModelMatrix renders a side-by-side comparison of eval results across
+// multiple models. models gives the column order. results maps model name to
+// run results for that model. skipped lists phase/case names skipped for all
+// models (same across models since skip logic depends on adapter config, not
+// model name).
+func FormatModelMatrix(models []string, results map[string][]RunResult, skipped []string) string {
+	if len(models) == 0 {
+		return ""
+	}
+
+	// Case order from first model's results.
+	firstResults := results[models[0]]
+	caseOrder := make([]string, 0, len(firstResults))
+	for _, r := range firstResults {
+		caseOrder = append(caseOrder, r.Case)
+	}
+
+	// Build per-model lookup: case → RunResult.
+	byModel := make(map[string]map[string]RunResult, len(models))
+	for _, m := range models {
+		byModel[m] = make(map[string]RunResult, len(results[m]))
+		for _, r := range results[m] {
+			byModel[m][r.Case] = r
+		}
+	}
+
+	// Column width = max(modelName, widest cell seen in data).
+	const caseWidth = 45
+	maxCellLen := len("SKIPPED") // minimum floor
+	for _, m := range models {
+		for _, r := range results[m] {
+			if w := len(fmt.Sprintf("PASS (%d/%d)", r.Runs, r.Runs)); w > maxCellLen {
+				maxCellLen = w
+			}
+		}
+	}
+	colW := make([]int, len(models))
+	for i, m := range models {
+		if w := len(m); w > maxCellLen {
+			colW[i] = w
+		} else {
+			colW[i] = maxCellLen
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("Model Comparison Report\n")
+	b.WriteString("=======================\n\n")
+
+	// Header row.
+	b.WriteString(fmt.Sprintf("%-*s  ", caseWidth, ""))
+	for i, m := range models {
+		b.WriteString(fmt.Sprintf("%-*s  ", colW[i], m))
+	}
+	b.WriteString("\n")
+
+	// Data rows.
+	for _, name := range caseOrder {
+		b.WriteString(fmt.Sprintf("%-*s  ", caseWidth, name))
+		for i, m := range models {
+			var cell string
+			if r, ok := byModel[m][name]; ok {
+				status := "PASS"
+				if !r.Pass {
+					status = "FAIL"
+				}
+				cell = fmt.Sprintf("%s (%d/%d)", status, r.Passes, r.Runs)
+			} else {
+				cell = "???"
+			}
+			b.WriteString(fmt.Sprintf("%-*s  ", colW[i], cell))
+		}
+		b.WriteString("\n")
+	}
+
+	// Skipped rows.
+	for _, s := range skipped {
+		b.WriteString(fmt.Sprintf("%-*s  ", caseWidth, s))
+		for i := range models {
+			b.WriteString(fmt.Sprintf("%-*s  ", colW[i], "SKIPPED"))
+		}
+		b.WriteString("\n")
+	}
+
+	// Summary: cases passed + avg pass rate across all runs.
+	b.WriteString("\nSummary\n-------\n")
+	for _, m := range models {
+		casesPassed, totalCases := 0, len(results[m])
+		totalPasses, totalRuns := 0, 0
+		for _, r := range results[m] {
+			if r.Pass {
+				casesPassed++
+			}
+			totalPasses += r.Passes
+			totalRuns += r.Runs
+		}
+		rate := 0.0
+		if totalRuns > 0 {
+			rate = float64(totalPasses) / float64(totalRuns) * 100
+		}
+		b.WriteString(fmt.Sprintf("%-25s %d/%d cases  avg %.0f%% pass rate\n", m, casesPassed, totalCases, rate))
+	}
+	return b.String()
+}
+
 // FormatReport produces a human-readable evaluation summary from the
 // given run results. Skipped lists phase/case names skipped because the
 // phase is unsupported or unconfigured.

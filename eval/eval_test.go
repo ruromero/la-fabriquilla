@@ -315,6 +315,48 @@ func TestFormatReport(t *testing.T) {
 	}
 }
 
+func TestFormatModelMatrix(t *testing.T) {
+	models := []string{"model-a", "model-b"}
+	results := map[string][]RunResult{
+		"model-a": {
+			{Case: "planner/case-001", Runs: 10, Passes: 10, Threshold: 8, TotalRuns: 10, Pass: true},
+			{Case: "coder/case-001", Runs: 10, Passes: 5, Threshold: 8, TotalRuns: 10, Pass: false},
+		},
+		"model-b": {
+			{Case: "planner/case-001", Runs: 10, Passes: 10, Threshold: 8, TotalRuns: 10, Pass: true},
+			{Case: "coder/case-001", Runs: 10, Passes: 10, Threshold: 8, TotalRuns: 10, Pass: true},
+		},
+	}
+	skipped := []string{"reviewer/reviewer-approves-clean-code"}
+
+	out := FormatModelMatrix(models, results, skipped)
+	for _, want := range []string{
+		"Model Comparison Report",
+		"model-a", "model-b",
+		"planner/case-001",
+		"coder/case-001",
+		"PASS (10/10)",
+		"FAIL (5/10)",
+		"SKIPPED",
+		"reviewer/reviewer-approves-clean-code",
+		"Summary",
+		"1/2 cases",
+		"2/2 cases",
+		"75%",  // model-a: 15/20 runs pass (10+5)/(10+10)
+		"100%", // model-b: 20/20 runs pass
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("FormatModelMatrix missing %q", want)
+		}
+	}
+}
+
+func TestFormatModelMatrixEmpty(t *testing.T) {
+	if got := FormatModelMatrix(nil, nil, nil); got != "" {
+		t.Errorf("expected empty string for nil models, got %q", got)
+	}
+}
+
 func TestRunCaseEErrorCountsAsFailedRun(t *testing.T) {
 	tc := TestCase{
 		Name:          "errcase",
