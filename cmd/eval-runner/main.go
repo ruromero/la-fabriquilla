@@ -346,8 +346,8 @@ func filterCases(cases []eval.TestCase, phases, nameSubstr string) []eval.TestCa
 // label is the display/map key (includes @endpoint when present); name is
 // the bare model ID sent to the inference API.
 type modelSpec struct {
-	label           string  // display key: "name" or "name@endpoint"
-	name            string  // bare model ID for the API
+	label           string // display key: "name" or "name@endpoint"
+	name            string // bare model ID for the API
 	baseURL         string
 	apiKey          string
 	inputPricePerM  float64 // USD per million input tokens; 0 = free/unknown
