@@ -1,0 +1,3 @@
+FROM qwen14b-opencode:latest
+PARAMETER num_ctx 8192
+PARAMETER num_gpu 99

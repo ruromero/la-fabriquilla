@@ -1,0 +1,3 @@
+FROM qwen3.5:35b-a3b
+PARAMETER num_ctx 32768
+PARAMETER num_gpu 99
