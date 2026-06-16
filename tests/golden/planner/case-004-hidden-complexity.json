@@ -1,0 +1,17 @@
+{
+  "name": "planner-detects-hidden-complexity",
+  "phase": "planner",
+  "inputs": {
+    "issue_title": "Add rate limiting to GitHub API client",
+    "issue_body": "We're hitting GitHub's rate limit (5000 req/hour). Add rate limiting to the client so we stay under the limit.",
+    "research_context": "GitHub API returns X-RateLimit-Remaining and X-RateLimit-Reset headers. Secondary rate limits exist for abuse detection (no explicit header). Conditional requests (If-None-Match/304) don't count against the limit.",
+    "gathered_context": "github/client.go wraps net/http. Used by dispatcher (polling), committer (PR creation), and reviewer (comment posting). Polling runs every 30s across multiple repos.",
+    "conventions": "Zero external dependencies. Use context.Context for cancellation. Shared state must be goroutine-safe."
+  },
+  "assertions": [
+    {"type": "outcome_equals", "value": "plan"},
+    {"type": "output_not_contains", "value": "NEEDS_INFO"},
+    {"type": "llm_judge", "value": "This is a HARD planning task. Check the plan against these criteria:\n1. Identifies that rate limiting must be goroutine-safe because multiple callers (dispatcher, committer, reviewer) share the client concurrently\n2. Proposes reading rate limit headers from GitHub API responses (X-RateLimit-Remaining or X-RateLimit-Reset) rather than using a fixed-rate timer\n3. Addresses what happens when the limit is hit: the plan must include a wait/backoff strategy, not just an error return\n4. Does NOT propose adding external rate-limiting libraries (e.g., golang.org/x/time/rate) — must use stdlib only\n5. Mentions or accounts for the fact that multiple repos share a single rate limit budget"}
+  ],
+  "pass_threshold": "5/10"
+}

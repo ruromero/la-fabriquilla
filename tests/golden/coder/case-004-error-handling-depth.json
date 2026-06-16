@@ -1,0 +1,17 @@
+{
+  "name": "coder-correct-error-handling",
+  "phase": "coder",
+  "inputs": {
+    "issue_title": "Add safe JSON config reload without downtime",
+    "plan": "Add a ReloadConfig function to config/config.go that re-reads the config file from disk and returns the new Config. The function must be safe to call while the system is running: if the new config is invalid (bad JSON, missing required fields), it must return an error without modifying any state. The caller keeps using the old config on failure.",
+    "gathered_context": "config/config.go has LoadConfig(path) (Config, error) which reads and parses. Config struct has required fields: Inference.BaseURL (must not be empty), Repos (must have at least one entry). No global state — config is passed by value.",
+    "conventions": "Errors wrap with fmt.Errorf and %w verb. Validate before returning. Functions are exported with doc comments."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "func"},
+    {"type": "output_contains", "value": "ReloadConfig"},
+    {"type": "file_paths_include", "value": "config/config.go"},
+    {"type": "llm_judge", "value": "This is a HARD coding task. Check the generated Go code against these criteria:\n1. The function reads the file and parses JSON into a NEW Config value (not modifying a global or pointer receiver in place)\n2. Validates required fields BEFORE returning: checks that Inference.BaseURL is non-empty and Repos has at least one entry\n3. Returns the validated Config and nil error on success, or zero-value Config and a wrapped error on any failure (file read, JSON parse, or validation)\n4. Does NOT use any global variables, package-level state, or init() functions\n5. Error messages are distinct for each failure mode (file not found vs invalid JSON vs missing required field) so the caller can diagnose the problem"}
+  ],
+  "pass_threshold": "5/10"
+}
