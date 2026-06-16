@@ -134,6 +134,7 @@ func main() {
 			a := &adapters{
 				agentClient: inference.NewClient(spec.baseURL, inference.WithAPIKey(spec.apiKey)),
 				agentModel:  spec.name,
+				modelLabel:  spec.label,
 				timeout:     cfg.Eval.TimeoutPerRun.Duration,
 			}
 			if *timeout > 0 {
@@ -285,7 +286,10 @@ func runCases(a *adapters, cases []eval.TestCase, runsOverride int, cfg config.C
 			caseRuns = total
 		}
 
-		runModel := a.agentModel
+		runModel := a.modelLabel
+		if runModel == "" {
+			runModel = a.agentModel
+		}
 		if tc.Phase == "arbiter" {
 			runModel = a.arbModel
 		}

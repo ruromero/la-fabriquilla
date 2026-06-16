@@ -20,6 +20,7 @@ import (
 type adapters struct {
 	agentClient *inference.Client
 	agentModel  string
+	modelLabel  string // name@endpoint for records; falls back to agentModel
 	arbClient   *inference.Client
 	arbModel    string
 	judgeClient *inference.Client
