@@ -11,7 +11,8 @@
     {"type": "output_contains", "value": "Timeout"},
     {"type": "output_contains", "value": "client"},
     {"type": "file_paths_include", "value": "github/client.go"},
-    {"type": "file_count_gte", "value": "1"}
+    {"type": "file_count_gte", "value": "1"},
+    {"type": "llm_judge", "value": "Check the generated Go code against these criteria:\n1. Sets a Timeout field on the http.Client struct (not on http.Transport or context)\n2. The default timeout value is 30 seconds (30 * time.Second or time.Duration equivalent)\n3. The timeout is configurable (accepted as a parameter, config field, or option)\n4. Does not remove or break existing client functionality (the code modifies, not rewrites)"}
   ],
-  "pass_threshold": "8/10"
+  "pass_threshold": "7/10"
 }

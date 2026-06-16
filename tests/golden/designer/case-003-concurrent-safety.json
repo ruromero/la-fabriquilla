@@ -1,0 +1,14 @@
+{
+  "name": "designer-handles-concurrency",
+  "phase": "designer",
+  "inputs": {
+    "plan": "PLAN:\n1. Add an in-memory cache for GitHub issue data to avoid redundant API calls during a single pipeline run\n2. Cache entries expire after 5 minutes\n3. The dispatcher spawns one goroutine per repo, all sharing the same cache instance",
+    "research_context": "",
+    "conventions": "Zero external Go dependencies — stdlib only. Use sync primitives for thread safety. Prefer simple designs over clever ones."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "cache"},
+    {"type": "llm_judge", "value": "This is a MEDIUM difficulty design task. Check the design against these criteria:\n1. Uses sync.RWMutex or sync.Map for concurrent access (not a plain map without synchronization)\n2. Describes the expiry mechanism: either a TTL check on read, a background reaper goroutine, or both\n3. The cache key strategy is defined (e.g., owner/repo/issue_number, not just issue number which would collide across repos)\n4. Does NOT propose using external caching libraries (groupcache, bigcache, etc.)"}
+  ],
+  "pass_threshold": "6/10"
+}

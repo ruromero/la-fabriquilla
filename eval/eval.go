@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -28,13 +29,16 @@ type Assertion struct {
 
 // RunResult captures the outcome of running a test case multiple times.
 type RunResult struct {
-	Case      string   `json:"case"`
-	Runs      int      `json:"runs"`
-	Passes    int      `json:"passes"`
-	Threshold int      `json:"threshold"`
-	TotalRuns int      `json:"total_runs"`
-	Pass      bool     `json:"pass"`
-	Failures  []string `json:"failures,omitempty"`
+	Case         string   `json:"case"`
+	Runs         int      `json:"runs"`
+	Passes       int      `json:"passes"`
+	Threshold    int      `json:"threshold"`
+	TotalRuns    int      `json:"total_runs"`
+	Pass         bool     `json:"pass"`
+	Failures     []string `json:"failures,omitempty"`
+	WallSecs     float64  `json:"wall_secs,omitempty"`
+	PromptTokens int      `json:"prompt_tokens,omitempty"`
+	CompTokens   int      `json:"comp_tokens,omitempty"`
 }
 
 // FileState represents a file produced by an agent run.
@@ -54,8 +58,10 @@ type OutputFunc func(tc TestCase, run int) (output string, files []FileState)
 type OutputFuncE func(tc TestCase, run int) (string, []FileState, error)
 
 // RunCaseE executes a test case like RunCase, treating output errors as
-// failed runs rather than aborting the case.
-func RunCaseE(tc TestCase, runs int, outputFn OutputFuncE) (RunResult, error) {
+// failed runs rather than aborting the case. If judge is non-nil,
+// llm_judge assertions are evaluated via the judge function; otherwise
+// they are skipped with a warning.
+func RunCaseE(ctx context.Context, tc TestCase, runs int, outputFn OutputFuncE, judge JudgeFunc) (RunResult, error) {
 	threshold, totalRuns, err := ParseThreshold(tc.PassThreshold)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("case %s: %w", tc.Name, err)
@@ -71,6 +77,22 @@ func RunCaseE(tc TestCase, runs int, outputFn OutputFuncE) (RunResult, error) {
 		}
 		allPassed := true
 		for _, a := range tc.Assertions {
+			if a.Type == "llm_judge" {
+				if judge == nil {
+					slog.Warn("llm_judge assertion skipped: no judge configured", "case", tc.Name)
+					continue
+				}
+				sys, usr := BuildJudgePrompt(tc, output, a.Value)
+				pass, explanation, err := judge(ctx, sys, usr)
+				if err != nil {
+					allPassed = false
+					failures = append(failures, fmt.Sprintf("Run %d: judge error: %v", run, err))
+				} else if !pass {
+					allPassed = false
+					failures = append(failures, fmt.Sprintf("Run %d: judge FAIL: %s", run, explanation))
+				}
+				continue
+			}
 			if !CheckAssertion(a, output, files) {
 				allPassed = false
 				failures = append(failures,
@@ -96,10 +118,10 @@ func RunCaseE(tc TestCase, runs int, outputFn OutputFuncE) (RunResult, error) {
 // RunCase executes a test case the specified number of times using
 // outputFn to produce output per run. Returns a RunResult.
 func RunCase(tc TestCase, runs int, outputFn OutputFunc) (RunResult, error) {
-	return RunCaseE(tc, runs, func(tc TestCase, run int) (string, []FileState, error) {
+	return RunCaseE(context.Background(), tc, runs, func(tc TestCase, run int) (string, []FileState, error) {
 		output, files := outputFn(tc, run)
 		return output, files, nil
-	})
+	}, nil)
 }
 
 // LoadTestCases loads all .json test case files from dir and its

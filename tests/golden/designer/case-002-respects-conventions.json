@@ -9,7 +9,8 @@
   "assertions": [
     {"type": "output_contains", "value": "net/http"},
     {"type": "output_not_contains", "value": "gin-gonic"},
-    {"type": "output_not_contains", "value": "chi"}
+    {"type": "output_not_contains", "value": "chi"},
+    {"type": "llm_judge", "value": "Check the design output against these criteria:\n1. Proposes an HTTP middleware pattern using only net/http (http.Handler or http.HandlerFunc wrapping)\n2. Captures all four fields: HTTP method, request path, response status code, and request duration\n3. Uses log/slog or encoding/json for structured logging (not fmt.Println or log.Printf)\n4. Does NOT reference any third-party web framework (gin, chi, echo, mux, fiber, etc.)"}
   ],
   "pass_threshold": "8/10"
 }

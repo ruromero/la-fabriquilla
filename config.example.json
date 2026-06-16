@@ -14,7 +14,23 @@
   "arbiter": {
     "base_url": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
-    "_comment": "Set ARBITER_API_KEY env var for authentication"
+    "_comment": "Set ARBITER_API_KEY env var for authentication",
+    "input_price_per_million_tokens": 0.14,
+    "output_price_per_million_tokens": 0.28
+  },
+  "endpoints": {
+    "deepseek": {
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "ARBITER_API_KEY",
+      "input_price_per_million_tokens": 0.14,
+      "output_price_per_million_tokens": 0.28
+    },
+    "gemini": {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "api_key_env": "GEMINI_API_KEY",
+      "input_price_per_million_tokens": 1.25,
+      "output_price_per_million_tokens": 10.00
+    }
   },
   "serena": {
     "command": "serena",

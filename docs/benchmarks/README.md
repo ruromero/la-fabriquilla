@@ -1,3 +1,4 @@
 # Model Benchmarks
 
-No benchmark runs yet.
+| Date (UTC) | Models | Phase | SHA | Report |
+|------------|--------|-------|-----|--------|

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -43,6 +44,8 @@ func main() {
 	resultsDir := flag.String("results", "", "results dir (default from config)")
 	benchmarkDir := flag.String("benchmark-dir", "docs/benchmarks", "directory to write model comparison reports (used with -models)")
 	noBenchmark := flag.Bool("no-benchmark", false, "skip writing benchmark report to -benchmark-dir (useful for quick smoke tests)")
+	judgeBaseURL := flag.String("judge-base-url", "", "judge endpoint for llm_judge assertions (default: arbiter endpoint)")
+	judgeModel := flag.String("judge-model", "", "judge model for llm_judge assertions (default: arbiter model)")
 	compare := flag.Bool("compare", false, "print comparison table from results history and exit")
 	flag.Parse()
 
@@ -102,28 +105,36 @@ func main() {
 	sha := gitSHA()
 
 	if *modelsFlag != "" {
-		modelList, err := splitModels(*modelsFlag)
+		specs, err := splitModels(*modelsFlag, cfg)
 		if err != nil {
 			slog.Error("invalid -models flag", "error", err)
 			os.Exit(1)
 		}
-		if len(modelList) == 0 {
+		if len(specs) == 0 {
 			slog.Error("no models parsed from -models flag")
 			os.Exit(1)
 		}
 
-		matrixResults := make(map[string][]eval.RunResult, len(modelList))
+		modelList := make([]string, len(specs))
+		for i, s := range specs {
+			modelList[i] = s.label
+		}
+
+		matrixResults := make(map[string][]eval.RunResult, len(specs))
 		var matrixSkipped []string
 
-		for _, m := range modelList {
-			if err := preflightOllama(cfg.Inference.BaseURL, m); err != nil {
-				slog.Error("preflight failed", "model", m, "error", err)
-				os.Exit(1)
+		for _, spec := range specs {
+			if spec.baseURL == cfg.Inference.BaseURL {
+				if err := preflightOllama(cfg.Inference.BaseURL, spec.name); err != nil {
+					slog.Error("preflight failed", "model", spec.label, "error", err)
+					os.Exit(1)
+				}
 			}
 
 			a := &adapters{
-				agentClient: inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey)),
-				agentModel:  m,
+				agentClient: inference.NewClient(spec.baseURL, inference.WithAPIKey(spec.apiKey)),
+				agentModel:  spec.name,
+				modelLabel:  spec.label,
 				timeout:     cfg.Eval.TimeoutPerRun.Duration,
 			}
 			if *timeout > 0 {
@@ -135,15 +146,16 @@ func main() {
 			}
 			if arbURL != "" {
 				a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
-				a.arbModel = m
+				a.arbModel = spec.name
 			}
+			configureJudge(a, cfg, *judgeBaseURL, *judgeModel)
 
 			results, skipped, err := runCases(a, cases, *runs, cfg, dir, sha)
 			if err != nil {
-				slog.Error("run cases", "model", m, "error", err)
+				slog.Error("run cases", "model", spec.label, "error", err)
 				os.Exit(1)
 			}
-			matrixResults[m] = results
+			matrixResults[spec.label] = results
 			if len(matrixSkipped) == 0 {
 				matrixSkipped = skipped
 			}
@@ -161,7 +173,14 @@ func main() {
 			os.Exit(1)
 		}
 
-		report := eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped)
+		pricing := make(map[string][2]float64, len(specs))
+		for _, spec := range specs {
+			if spec.inputPricePerM > 0 || spec.outputPricePerM > 0 {
+				pricing[spec.label] = [2]float64{spec.inputPricePerM, spec.outputPricePerM}
+			}
+		}
+
+		report := eval.FormatModelMatrix(modelList, matrixResults, matrixSkipped, pricing)
 		fmt.Print(report)
 
 		if *benchmarkDir != "" && !*noBenchmark {
@@ -219,6 +238,7 @@ func main() {
 	} else {
 		slog.Warn("arbiter endpoint not configured — arbiter cases will be skipped")
 	}
+	configureJudge(a, cfg, *judgeBaseURL, *judgeModel)
 
 	results, skipped, err := runCases(a, cases, *runs, cfg, dir, sha)
 	if err != nil {
@@ -244,6 +264,8 @@ func main() {
 // to the JSONL history. runsOverride < 0 uses cfg.Eval.RunsPerCase;
 // runsOverride == 0 uses the threshold denominator.
 func runCases(a *adapters, cases []eval.TestCase, runsOverride int, cfg config.Config, dir, sha string) ([]eval.RunResult, []string, error) {
+	ctx := context.Background()
+	judge := a.judgeFunc()
 	var results []eval.RunResult
 	var skipped []string
 	for _, tc := range cases {
@@ -264,18 +286,24 @@ func runCases(a *adapters, cases []eval.TestCase, runsOverride int, cfg config.C
 			caseRuns = total
 		}
 
-		runModel := a.agentModel
+		runModel := a.modelLabel
+		if runModel == "" {
+			runModel = a.agentModel
+		}
 		if tc.Phase == "arbiter" {
 			runModel = a.arbModel
 		}
 		slog.Info("running case", "case", tc.Phase+"/"+tc.Name, "runs", caseRuns, "model", runModel)
 		start := time.Now()
-		result, err := eval.RunCaseE(tc, caseRuns, fn)
+		result, err := eval.RunCaseE(ctx, tc, caseRuns, fn, judge)
 		if err != nil {
 			return nil, nil, fmt.Errorf("run case %s: %w", tc.Name, err)
 		}
 		wall := time.Since(start)
 		prompt, comp := a.takeUsage()
+		result.WallSecs = wall.Seconds()
+		result.PromptTokens = prompt
+		result.CompTokens = comp
 		results = append(results, result)
 
 		rec := eval.Record{
@@ -323,19 +351,102 @@ func filterCases(cases []eval.TestCase, phases, nameSubstr string) []eval.TestCa
 	return out
 }
 
-func splitModels(s string) ([]string, error) {
+// modelSpec holds per-model endpoint and pricing configuration parsed from
+// the -models flag. Use "name@endpoint" to route a model through a named
+// endpoint defined in config (useful for comparing local vs API models).
+// label is the display/map key (includes @endpoint when present); name is
+// the bare model ID sent to the inference API.
+type modelSpec struct {
+	label           string // display key: "name" or "name@endpoint"
+	name            string // bare model ID for the API
+	baseURL         string
+	apiKey          string
+	inputPricePerM  float64 // USD per million input tokens; 0 = free/unknown
+	outputPricePerM float64 // USD per million output tokens
+}
+
+func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 	seen := make(map[string]bool)
-	var out []string
-	for _, m := range strings.Split(s, ",") {
-		if m = strings.TrimSpace(m); m != "" {
-			if seen[m] {
-				return nil, fmt.Errorf("duplicate model %q in -models flag", m)
-			}
-			seen[m] = true
-			out = append(out, m)
+	var out []modelSpec
+	for _, token := range strings.Split(s, ",") {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
 		}
+		name, endpoint, hasEndpoint := strings.Cut(token, "@")
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil, fmt.Errorf("empty model name in -models flag")
+		}
+
+		label := name
+		if hasEndpoint {
+			label = name + "@" + endpoint
+		}
+		if seen[label] {
+			return nil, fmt.Errorf("duplicate model %q in -models flag", label)
+		}
+		seen[label] = true
+
+		spec := modelSpec{label: label, name: name, baseURL: cfg.Inference.BaseURL, apiKey: cfg.Inference.APIKey}
+		if hasEndpoint {
+			if ep, ok := cfg.Endpoints[endpoint]; ok {
+				spec.baseURL = ep.BaseURL
+				spec.apiKey = ep.APIKey
+				spec.inputPricePerM = ep.InputPricePerMToken
+				spec.outputPricePerM = ep.OutputPricePerMToken
+			} else if endpoint == "arbiter" {
+				if cfg.Arbiter.BaseURL == "" {
+					return nil, fmt.Errorf("model %q uses @arbiter but arbiter.base_url is not configured", name)
+				}
+				spec.baseURL = cfg.Arbiter.BaseURL
+				spec.apiKey = cfg.Arbiter.APIKey
+				spec.inputPricePerM = cfg.Arbiter.InputPricePerMToken
+				spec.outputPricePerM = cfg.Arbiter.OutputPricePerMToken
+			} else {
+				return nil, fmt.Errorf("unknown endpoint %q for model %q; define it in config endpoints or use 'arbiter'", endpoint, name)
+			}
+		}
+		out = append(out, spec)
 	}
 	return out, nil
+}
+
+// configureJudge sets the judge client on the adapters. Explicit flags
+// take precedence; otherwise the arbiter endpoint is reused. The model
+// flag supports the name@endpoint syntax for named endpoints.
+func configureJudge(a *adapters, cfg config.Config, judgeURL, judgeMdl string) {
+	url := judgeURL
+	mdl := judgeMdl
+	apiKey := ""
+
+	if judgeMdl != "" {
+		name, endpoint, hasEndpoint := strings.Cut(judgeMdl, "@")
+		mdl = name
+		if hasEndpoint && url == "" {
+			if ep, ok := cfg.Endpoints[endpoint]; ok {
+				url = ep.BaseURL
+				apiKey = ep.APIKey
+			} else if endpoint == "arbiter" {
+				url = cfg.Arbiter.BaseURL
+				apiKey = cfg.Arbiter.APIKey
+			}
+		}
+	}
+
+	if url == "" && mdl == "" {
+		url = cfg.Arbiter.BaseURL
+		mdl = cfg.Arbiter.Model
+		apiKey = cfg.Arbiter.APIKey
+	}
+
+	if url != "" && mdl != "" {
+		if apiKey == "" {
+			apiKey = cfg.Arbiter.APIKey
+		}
+		a.judgeClient = inference.NewClient(url, inference.WithAPIKey(apiKey))
+		a.judgeModel = mdl
+	}
 }
 
 func defaultConfigPath() string {

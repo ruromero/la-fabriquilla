@@ -20,8 +20,11 @@ import (
 type adapters struct {
 	agentClient *inference.Client
 	agentModel  string
+	modelLabel  string // name@endpoint for records; falls back to agentModel
 	arbClient   *inference.Client
 	arbModel    string
+	judgeClient *inference.Client
+	judgeModel  string
 	timeout     time.Duration
 
 	promptTokens int
@@ -158,6 +161,26 @@ func parseCaseFindings(raw, source string) ([]review.ReviewFinding, error) {
 		})
 	}
 	return findings, nil
+}
+
+// judgeFunc returns the JudgeFunc for llm_judge assertions, or nil
+// when no judge endpoint is configured.
+func (a *adapters) judgeFunc() eval.JudgeFunc {
+	if a.judgeClient == nil || a.judgeModel == "" {
+		return nil
+	}
+	return func(ctx context.Context, system, user string) (bool, string, error) {
+		content, usage, err := a.judgeClient.SimpleChat(ctx, a.judgeModel, system, user)
+		if err != nil {
+			return false, "", fmt.Errorf("judge inference: %w", err)
+		}
+		a.addUsage(usage.PromptTokens, usage.CompletionTokens)
+		resp, err := eval.ParseJudgeResponse(content)
+		if err != nil {
+			return false, "", fmt.Errorf("judge response parse: %w (raw: %s)", err, content)
+		}
+		return resp.Pass, resp.Explanation, nil
+	}
 }
 
 func (a *adapters) runArbiter(tc eval.TestCase, _ int) (string, []eval.FileState, error) {

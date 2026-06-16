@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -329,7 +330,7 @@ func TestFormatModelMatrix(t *testing.T) {
 	}
 	skipped := []string{"reviewer/reviewer-approves-clean-code"}
 
-	out := FormatModelMatrix(models, results, skipped)
+	out := FormatModelMatrix(models, results, skipped, nil)
 	for _, want := range []string{
 		"Model Comparison Report",
 		"model-a", "model-b",
@@ -352,7 +353,7 @@ func TestFormatModelMatrix(t *testing.T) {
 }
 
 func TestFormatModelMatrixEmpty(t *testing.T) {
-	if got := FormatModelMatrix(nil, nil, nil); got != "" {
+	if got := FormatModelMatrix(nil, nil, nil, nil); got != "" {
 		t.Errorf("expected empty string for nil models, got %q", got)
 	}
 }
@@ -372,7 +373,7 @@ func TestRunCaseEErrorCountsAsFailedRun(t *testing.T) {
 		}
 		return "x", nil, nil
 	}
-	res, err := RunCaseE(tc, 2, fn)
+	res, err := RunCaseE(context.Background(), tc, 2, fn, nil)
 	if err != nil {
 		t.Fatalf("RunCaseE: %v", err)
 	}
@@ -391,4 +392,67 @@ func TestRunCaseEErrorCountsAsFailedRun(t *testing.T) {
 	if !found {
 		t.Errorf("error not recorded in failures: %v", res.Failures)
 	}
+}
+
+func TestRunCaseEWithJudge(t *testing.T) {
+	tc := TestCase{
+		Name:  "judge-test",
+		Phase: "coder",
+		Inputs: map[string]string{
+			"plan": "Add a Foo function",
+		},
+		Assertions: []Assertion{
+			{Type: "output_contains", Value: "func"},
+			{Type: "llm_judge", Value: "Check that the code defines a function named Foo"},
+		},
+		PassThreshold: "1/1",
+	}
+
+	t.Run("judge passes", func(t *testing.T) {
+		judge := func(_ context.Context, _, _ string) (bool, string, error) {
+			return true, "all criteria met", nil
+		}
+		fn := func(_ TestCase, _ int) (string, []FileState, error) {
+			return "func Foo() {}", nil, nil
+		}
+		res, err := RunCaseE(context.Background(), tc, 1, fn, judge)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !res.Pass {
+			t.Errorf("expected pass, got fail: %v", res.Failures)
+		}
+	})
+
+	t.Run("judge fails", func(t *testing.T) {
+		judge := func(_ context.Context, _, _ string) (bool, string, error) {
+			return false, "function Foo not found", nil
+		}
+		fn := func(_ TestCase, _ int) (string, []FileState, error) {
+			return "func Bar() {}", nil, nil
+		}
+		res, err := RunCaseE(context.Background(), tc, 1, fn, judge)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Pass {
+			t.Error("expected fail when judge rejects")
+		}
+		if len(res.Failures) == 0 {
+			t.Error("expected failure message from judge")
+		}
+	})
+
+	t.Run("nil judge skips assertion", func(t *testing.T) {
+		fn := func(_ TestCase, _ int) (string, []FileState, error) {
+			return "func Foo() {}", nil, nil
+		}
+		res, err := RunCaseE(context.Background(), tc, 1, fn, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !res.Pass {
+			t.Errorf("expected pass when judge is nil (skipped): %v", res.Failures)
+		}
+	})
 }

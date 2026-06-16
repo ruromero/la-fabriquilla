@@ -21,6 +21,7 @@ You must do ONE of the following:
    - WHAT to change (which file/module/layer)
    - WHY (the functional requirement it satisfies)
    - Whether it modifies existing code or adds new code
+   - For guard clauses or validation checks, state the action on failure (return error, skip, log+continue, etc.)
    Do NOT include code snippets, SQL, API signatures, or framework-specific details.
    Start your response with "PLAN:" on the first line.
 

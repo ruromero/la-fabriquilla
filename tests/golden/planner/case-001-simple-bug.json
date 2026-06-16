@@ -11,7 +11,8 @@
   "assertions": [
     {"type": "outcome_equals", "value": "plan"},
     {"type": "output_contains", "value": "config"},
-    {"type": "output_not_contains", "value": "NEEDS_INFO"}
+    {"type": "output_not_contains", "value": "NEEDS_INFO"},
+    {"type": "llm_judge", "value": "Check the plan output against these criteria:\n1. Identifies the root cause as a missing nil/empty check after JSON unmarshaling\n2. Proposes adding a guard clause or validation before accessing struct fields\n3. Mentions returning an error (not panicking) when the config is empty or invalid\n4. Scopes the fix to config.go (does not propose unrelated changes)"}
   ],
-  "pass_threshold": "8/10"
+  "pass_threshold": "7/10"
 }

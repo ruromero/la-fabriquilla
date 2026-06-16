@@ -12,7 +12,8 @@
     {"type": "outcome_equals", "value": "plan"},
     {"type": "output_contains", "value": "webhook"},
     {"type": "output_contains", "value": "config"},
-    {"type": "output_not_contains", "value": "NEEDS_INFO"}
+    {"type": "output_not_contains", "value": "NEEDS_INFO"},
+    {"type": "llm_judge", "value": "Check the plan output against these criteria:\n1. Decomposes the task into at least 3 distinct steps (not a single monolithic description)\n2. Addresses all three requirements: configurable endpoints, retry logic, and HMAC signing\n3. Identifies which existing files need modification (config.go for webhook config)\n4. Proposes creating new files for the webhook implementation (not cramming into existing files)\n5. Does NOT propose adding external Go dependencies"}
   ],
   "pass_threshold": "7/10"
 }
