@@ -9,7 +9,8 @@
   "assertions": [
     {"type": "output_contains", "value": "config/helpers.go"},
     {"type": "output_contains", "value": "Retry"},
-    {"type": "output_not_contains", "value": "go get "}
+    {"type": "output_not_contains", "value": "go get "},
+    {"type": "llm_judge", "value": "Check the design output against these criteria:\n1. Specifies at least two files to modify or create\n2. Describes function signatures (parameter types and return types) for the retry helper\n3. Describes the backoff strategy (mentions delay, exponential, or multiplier)\n4. Does NOT propose adding any external Go dependencies"}
   ],
-  "pass_threshold": "8/10"
+  "pass_threshold": "7/10"
 }

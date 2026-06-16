@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -43,6 +44,8 @@ func main() {
 	resultsDir := flag.String("results", "", "results dir (default from config)")
 	benchmarkDir := flag.String("benchmark-dir", "docs/benchmarks", "directory to write model comparison reports (used with -models)")
 	noBenchmark := flag.Bool("no-benchmark", false, "skip writing benchmark report to -benchmark-dir (useful for quick smoke tests)")
+	judgeBaseURL := flag.String("judge-base-url", "", "judge endpoint for llm_judge assertions (default: arbiter endpoint)")
+	judgeModel := flag.String("judge-model", "", "judge model for llm_judge assertions (default: arbiter model)")
 	compare := flag.Bool("compare", false, "print comparison table from results history and exit")
 	flag.Parse()
 
@@ -144,6 +147,7 @@ func main() {
 				a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
 				a.arbModel = spec.name
 			}
+			configureJudge(a, cfg, *judgeBaseURL, *judgeModel)
 
 			results, skipped, err := runCases(a, cases, *runs, cfg, dir, sha)
 			if err != nil {
@@ -233,6 +237,7 @@ func main() {
 	} else {
 		slog.Warn("arbiter endpoint not configured — arbiter cases will be skipped")
 	}
+	configureJudge(a, cfg, *judgeBaseURL, *judgeModel)
 
 	results, skipped, err := runCases(a, cases, *runs, cfg, dir, sha)
 	if err != nil {
@@ -258,6 +263,8 @@ func main() {
 // to the JSONL history. runsOverride < 0 uses cfg.Eval.RunsPerCase;
 // runsOverride == 0 uses the threshold denominator.
 func runCases(a *adapters, cases []eval.TestCase, runsOverride int, cfg config.Config, dir, sha string) ([]eval.RunResult, []string, error) {
+	ctx := context.Background()
+	judge := a.judgeFunc()
 	var results []eval.RunResult
 	var skipped []string
 	for _, tc := range cases {
@@ -284,7 +291,7 @@ func runCases(a *adapters, cases []eval.TestCase, runsOverride int, cfg config.C
 		}
 		slog.Info("running case", "case", tc.Phase+"/"+tc.Name, "runs", caseRuns, "model", runModel)
 		start := time.Now()
-		result, err := eval.RunCaseE(tc, caseRuns, fn)
+		result, err := eval.RunCaseE(ctx, tc, caseRuns, fn, judge)
 		if err != nil {
 			return nil, nil, fmt.Errorf("run case %s: %w", tc.Name, err)
 		}
@@ -399,6 +406,43 @@ func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 		out = append(out, spec)
 	}
 	return out, nil
+}
+
+// configureJudge sets the judge client on the adapters. Explicit flags
+// take precedence; otherwise the arbiter endpoint is reused. The model
+// flag supports the name@endpoint syntax for named endpoints.
+func configureJudge(a *adapters, cfg config.Config, judgeURL, judgeMdl string) {
+	url := judgeURL
+	mdl := judgeMdl
+	apiKey := ""
+
+	if judgeMdl != "" {
+		name, endpoint, hasEndpoint := strings.Cut(judgeMdl, "@")
+		mdl = name
+		if hasEndpoint && url == "" {
+			if ep, ok := cfg.Endpoints[endpoint]; ok {
+				url = ep.BaseURL
+				apiKey = ep.APIKey
+			} else if endpoint == "arbiter" {
+				url = cfg.Arbiter.BaseURL
+				apiKey = cfg.Arbiter.APIKey
+			}
+		}
+	}
+
+	if url == "" && mdl == "" {
+		url = cfg.Arbiter.BaseURL
+		mdl = cfg.Arbiter.Model
+		apiKey = cfg.Arbiter.APIKey
+	}
+
+	if url != "" && mdl != "" {
+		if apiKey == "" {
+			apiKey = cfg.Arbiter.APIKey
+		}
+		a.judgeClient = inference.NewClient(url, inference.WithAPIKey(apiKey))
+		a.judgeModel = mdl
+	}
 }
 
 func defaultConfigPath() string {

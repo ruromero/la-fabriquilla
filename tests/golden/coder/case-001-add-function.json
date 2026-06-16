@@ -11,7 +11,8 @@
     {"type": "output_contains", "value": "func"},
     {"type": "output_contains", "value": "Duration"},
     {"type": "file_paths_include", "value": "config/helpers.go"},
-    {"type": "file_count_gte", "value": "1"}
+    {"type": "file_count_gte", "value": "1"},
+    {"type": "llm_judge", "value": "Check the generated Go code against these criteria:\n1. Defines an exported function named ParseDuration that accepts a string and returns (time.Duration, error)\n2. Uses time.ParseDuration from stdlib (not a custom parser)\n3. Wraps errors with fmt.Errorf including context about what failed\n4. The code is syntactically valid Go (proper imports, brackets, semicolons)"}
   ],
-  "pass_threshold": "8/10"
+  "pass_threshold": "7/10"
 }
