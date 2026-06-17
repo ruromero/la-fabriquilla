@@ -177,10 +177,10 @@ func TestHumanAdapter_ParseFindings(t *testing.T) {
 
 func TestParseHumanComment(t *testing.T) {
 	tests := []struct {
-		name     string
-		body     string
-		wantCat  Category
-		wantSev  Severity
+		name    string
+		body    string
+		wantCat Category
+		wantSev Severity
 	}{
 		{"security keyword", "This endpoint has an injection vulnerability", CategorySecurity, SeverityMedium},
 		{"bug keyword", "This is a bug in the parser", CategoryCorrectness, SeverityMedium},
