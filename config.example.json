@@ -1,37 +1,35 @@
 {
-  "inference": {
-    "base_url": "http://localhost:11434/v1",
-    "model": "qwen2.5-coder:14b"
-  },
-  "poll_interval": "30s",
-  "max_iterations": 3,
-  "max_cost_budget": 100000,
-  "shadow_mode": true,
+  "default_model": "qwen2.5-coder:14b@ollama",
   "planner": {
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-    "model": "gemini-2.5-flash"
+    "model": "gemini-2.5-flash@gemini"
+  },
+  "researcher": {
+    "model": "gemini-2.5-flash@gemini"
   },
   "arbiter": {
-    "base_url": "https://api.deepseek.com/v1",
-    "model": "deepseek-chat",
-    "_comment": "Set ARBITER_API_KEY env var for authentication",
-    "input_price_per_million_tokens": 0.14,
-    "output_price_per_million_tokens": 0.28
+    "model": "deepseek-chat@deepseek"
   },
   "endpoints": {
-    "deepseek": {
-      "base_url": "https://api.deepseek.com/v1",
-      "api_key_env": "ARBITER_API_KEY",
-      "input_price_per_million_tokens": 0.14,
-      "output_price_per_million_tokens": 0.28
+    "ollama": {
+      "base_url": "http://localhost:11434/v1"
     },
     "gemini": {
       "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
       "api_key_env": "GEMINI_API_KEY",
       "input_price_per_million_tokens": 1.25,
       "output_price_per_million_tokens": 10.00
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "input_price_per_million_tokens": 0.14,
+      "output_price_per_million_tokens": 0.28
     }
   },
+  "poll_interval": "30s",
+  "max_iterations": 3,
+  "max_cost_budget": 100000,
+  "shadow_mode": true,
   "serena": {
     "command": "serena",
     "args": ["start-mcp-server"]

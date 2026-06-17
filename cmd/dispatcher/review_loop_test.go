@@ -193,7 +193,7 @@ func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
 	cfg := &config.Config{
 		MaxIterations: 3,
 		MaxCostBudget: 100000,
-		Arbiter: config.RoleConfig{Model: "deepseek-chat@deepseek"},
+		Arbiter:       config.RoleConfig{Model: "deepseek-chat@deepseek"},
 		Endpoints: map[string]config.EndpointConfig{
 			"deepseek": {BaseURL: "https://api.deepseek.com/v1"},
 		},
