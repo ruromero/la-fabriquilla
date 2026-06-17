@@ -14,16 +14,17 @@ import (
 
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
-	if cfg.Inference.Model == "" {
-		slog.Error("inference.model is required in config")
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	if err != nil {
+		slog.Error("resolve default model", "error", err)
 		os.Exit(1)
 	}
 
-	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
+	cl := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
 	ctx := context.Background()
 
 	start := time.Now()
-	result, err := agents.DesignWithUsage(ctx, cl, cfg.Inference.Model, state.PlanContent, state.ResearchContext, state.Conventions)
+	result, err := agents.DesignWithUsage(ctx, cl, model, state.PlanContent, state.ResearchContext, state.Conventions)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("design phase failed", "error", err)
