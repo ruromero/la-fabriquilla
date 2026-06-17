@@ -82,8 +82,8 @@ func main() {
 		return
 	}
 
-	if cfg.Inference.BaseURL == "" {
-		slog.Error("inference.base_url is required in config")
+	if cfg.DefaultModel == "" {
+		slog.Error("default_model is required in config")
 		os.Exit(1)
 	}
 
@@ -124,11 +124,9 @@ func main() {
 		var matrixSkipped []string
 
 		for _, spec := range specs {
-			if spec.baseURL == cfg.Inference.BaseURL {
-				if err := preflightOllama(cfg.Inference.BaseURL, spec.name); err != nil {
-					slog.Error("preflight failed", "model", spec.label, "error", err)
-					os.Exit(1)
-				}
+			if err := preflightOllama(spec.baseURL, spec.name); err != nil {
+				slog.Error("preflight failed", "model", spec.label, "error", err)
+				os.Exit(1)
 			}
 
 			a := &adapters{
@@ -140,12 +138,21 @@ func main() {
 			if *timeout > 0 {
 				a.timeout = *timeout
 			}
-			arbURL := cfg.Arbiter.BaseURL
+			arbURL := ""
+			arbKey := ""
+			if cfg.Arbiter.Model != "" {
+				_, u, k, err := cfg.ResolveModel(cfg.Arbiter.Model)
+				if err == nil {
+					arbURL = u
+					arbKey = k
+				}
+			}
 			if *arbBaseURL != "" {
 				arbURL = *arbBaseURL
+				arbKey = ""
 			}
 			if arbURL != "" {
-				a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
+				a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(arbKey))
 				a.arbModel = spec.name
 			}
 			configureJudge(a, cfg, *judgeBaseURL, *judgeModel)
@@ -203,21 +210,26 @@ func main() {
 	}
 
 	// Single-model mode.
-	agentModel := cfg.Inference.Model
+	agentSpec := cfg.DefaultModel
 	if *model != "" {
-		agentModel = *model
+		agentSpec = *model
 	}
-	if agentModel == "" {
-		slog.Error("agent model required: set inference.model in config or pass -model")
+	if agentSpec == "" {
+		slog.Error("agent model required: set default_model in config or pass -model")
 		os.Exit(1)
 	}
-	if err := preflightOllama(cfg.Inference.BaseURL, agentModel); err != nil {
+	agentModel, agentURL, agentKey, err := cfg.ResolveModel(agentSpec)
+	if err != nil {
+		slog.Error("resolve agent model", "error", err)
+		os.Exit(1)
+	}
+	if err := preflightOllama(agentURL, agentModel); err != nil {
 		slog.Error("preflight failed", "error", err)
 		os.Exit(1)
 	}
 
 	a := &adapters{
-		agentClient: inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey)),
+		agentClient: inference.NewClient(agentURL, inference.WithAPIKey(agentKey)),
 		agentModel:  agentModel,
 		timeout:     cfg.Eval.TimeoutPerRun.Duration,
 	}
@@ -225,7 +237,16 @@ func main() {
 		a.timeout = *timeout
 	}
 
-	arbURL, arbMdl := cfg.Arbiter.BaseURL, cfg.Arbiter.Model
+	arbURL, arbMdl := "", ""
+	arbKey := ""
+	if cfg.Arbiter.Model != "" {
+		m, u, k, err := cfg.ResolveModel(cfg.Arbiter.Model)
+		if err == nil {
+			arbURL = u
+			arbMdl = m
+			arbKey = k
+		}
+	}
 	if *arbBaseURL != "" {
 		arbURL = *arbBaseURL
 	}
@@ -233,7 +254,7 @@ func main() {
 		arbMdl = *arbModel
 	}
 	if arbURL != "" && arbMdl != "" {
-		a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
+		a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(arbKey))
 		a.arbModel = arbMdl
 	} else {
 		slog.Warn("arbiter endpoint not configured — arbiter cases will be skipped")
@@ -373,38 +394,29 @@ func splitModels(s string, cfg config.Config) ([]modelSpec, error) {
 		if token == "" {
 			continue
 		}
-		name, endpoint, hasEndpoint := strings.Cut(token, "@")
+		name, _, hasEndpoint := strings.Cut(token, "@")
 		name = strings.TrimSpace(name)
 		if name == "" {
 			return nil, fmt.Errorf("empty model name in -models flag")
 		}
 
-		label := name
-		if hasEndpoint {
-			label = name + "@" + endpoint
-		}
+		label := token
 		if seen[label] {
 			return nil, fmt.Errorf("duplicate model %q in -models flag", label)
 		}
 		seen[label] = true
 
-		spec := modelSpec{label: label, name: name, baseURL: cfg.Inference.BaseURL, apiKey: cfg.Inference.APIKey}
+		resolvedModel, baseURL, apiKey, err := cfg.ResolveModel(token)
+		if err != nil {
+			return nil, fmt.Errorf("resolve model %q: %w", token, err)
+		}
+
+		spec := modelSpec{label: label, name: resolvedModel, baseURL: baseURL, apiKey: apiKey}
 		if hasEndpoint {
-			if ep, ok := cfg.Endpoints[endpoint]; ok {
-				spec.baseURL = ep.BaseURL
-				spec.apiKey = ep.APIKey
+			_, epName, _ := strings.Cut(token, "@")
+			if ep, ok := cfg.Endpoints[epName]; ok {
 				spec.inputPricePerM = ep.InputPricePerMToken
 				spec.outputPricePerM = ep.OutputPricePerMToken
-			} else if endpoint == "arbiter" {
-				if cfg.Arbiter.BaseURL == "" {
-					return nil, fmt.Errorf("model %q uses @arbiter but arbiter.base_url is not configured", name)
-				}
-				spec.baseURL = cfg.Arbiter.BaseURL
-				spec.apiKey = cfg.Arbiter.APIKey
-				spec.inputPricePerM = cfg.Arbiter.InputPricePerMToken
-				spec.outputPricePerM = cfg.Arbiter.OutputPricePerMToken
-			} else {
-				return nil, fmt.Errorf("unknown endpoint %q for model %q; define it in config endpoints or use 'arbiter'", endpoint, name)
 			}
 		}
 		out = append(out, spec)
@@ -421,29 +433,29 @@ func configureJudge(a *adapters, cfg config.Config, judgeURL, judgeMdl string) {
 	apiKey := ""
 
 	if judgeMdl != "" {
-		name, endpoint, hasEndpoint := strings.Cut(judgeMdl, "@")
-		mdl = name
+		name, _, hasEndpoint := strings.Cut(judgeMdl, "@")
 		if hasEndpoint && url == "" {
-			if ep, ok := cfg.Endpoints[endpoint]; ok {
-				url = ep.BaseURL
-				apiKey = ep.APIKey
-			} else if endpoint == "arbiter" {
-				url = cfg.Arbiter.BaseURL
-				apiKey = cfg.Arbiter.APIKey
+			m, u, k, err := cfg.ResolveModel(judgeMdl)
+			if err == nil {
+				mdl = m
+				url = u
+				apiKey = k
 			}
+		} else {
+			mdl = name
 		}
 	}
 
-	if url == "" && mdl == "" {
-		url = cfg.Arbiter.BaseURL
-		mdl = cfg.Arbiter.Model
-		apiKey = cfg.Arbiter.APIKey
+	if url == "" && mdl == "" && cfg.Arbiter.Model != "" {
+		m, u, k, err := cfg.ResolveModel(cfg.Arbiter.Model)
+		if err == nil {
+			url = u
+			mdl = m
+			apiKey = k
+		}
 	}
 
 	if url != "" && mdl != "" {
-		if apiKey == "" {
-			apiKey = cfg.Arbiter.APIKey
-		}
 		a.judgeClient = inference.NewClient(url, inference.WithAPIKey(apiKey))
 		a.judgeModel = mdl
 	}
