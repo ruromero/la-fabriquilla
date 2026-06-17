@@ -26,6 +26,9 @@ go.work.sum
 
 # Build output
 bin/
+/dispatcher
+/reviewer
+/eval-runner
 
 # env file
 .env
@@ -41,6 +44,12 @@ eval-results/
 
 # Benchmark index (generated on each WriteBenchmark call — not source)
 docs/benchmarks/README.md
+
+# OS files
+.DS_Store
+
+# Claude Code workspace
+.claude/
 
 # Editor/IDE
 # .idea/
