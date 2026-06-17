@@ -15,16 +15,21 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	if cfg.Planner.BaseURL == "" || cfg.Planner.APIKey == "" {
-		slog.Error("planner API not configured")
+	spec := cfg.Planner.Model
+	if spec == "" {
+		spec = cfg.DefaultModel
+	}
+	model, baseURL, apiKey, err := cfg.ResolveModel(spec)
+	if err != nil {
+		slog.Error("resolve planner model", "error", err)
 		os.Exit(1)
 	}
 
-	client := inference.NewClient(cfg.Planner.BaseURL, inference.WithAPIKey(cfg.Planner.APIKey))
+	client := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
 	ctx := context.Background()
 
 	start := time.Now()
-	plan, err := agents.Plan(ctx, client, cfg.Planner.Model,
+	plan, err := agents.Plan(ctx, client, model,
 		state.IssueTitle, state.IssueBody,
 		state.ResearchContext, state.GatheredContext,
 		state.Conventions, state.CommentHistory)

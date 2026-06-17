@@ -13,34 +13,25 @@ import (
 
 func TestConfigValueCopyIsolation(t *testing.T) {
 	original := config.Config{
-		Inference: config.InferenceConfig{
-			BaseURL: "http://localhost:11434/v1",
-			APIKey:  "original-key",
-		},
+		DefaultModel:    "qwen2.5-coder:14b@ollama",
 		MaxIterations:   3,
 		MaxCostBudget:   100000,
 		ShadowMode:      true,
 		MaxFilesChanged: 20,
 		MaxPRSizeLines:  500,
-		Arbiter: config.ArbiterConfig{
-			BaseURL: "http://arbiter:8080/v1",
-			Model:   "deepseek-r1:14b",
+		Arbiter: config.RoleConfig{
+			Model: "deepseek-r1:14b@deepseek",
 		},
 	}
 
 	mutated := original
-	mutated.Inference.BaseURL = "http://evil.com/v1"
-	mutated.Inference.APIKey = "stolen-key"
+	mutated.DefaultModel = "http://evil.com/v1"
 	mutated.MaxIterations = 999
 	mutated.ShadowMode = false
-	mutated.Arbiter.BaseURL = "http://evil-arbiter.com"
 	mutated.Arbiter.Model = "evil-model"
 
-	if original.Inference.BaseURL != "http://localhost:11434/v1" {
-		t.Error("config.Inference.BaseURL was mutated via copy")
-	}
-	if original.Inference.APIKey != "original-key" {
-		t.Error("config.Inference.APIKey was mutated via copy")
+	if original.DefaultModel != "qwen2.5-coder:14b@ollama" {
+		t.Error("config.DefaultModel was mutated via copy")
 	}
 	if original.MaxIterations != 3 {
 		t.Error("config.MaxIterations was mutated via copy")
@@ -48,10 +39,7 @@ func TestConfigValueCopyIsolation(t *testing.T) {
 	if !original.ShadowMode {
 		t.Error("config.ShadowMode was mutated via copy")
 	}
-	if original.Arbiter.BaseURL != "http://arbiter:8080/v1" {
-		t.Error("config.Arbiter.BaseURL was mutated via copy")
-	}
-	if original.Arbiter.Model != "deepseek-r1:14b" {
+	if original.Arbiter.Model != "deepseek-r1:14b@deepseek" {
 		t.Error("config.Arbiter.Model was mutated via copy")
 	}
 }
@@ -81,8 +69,8 @@ func TestConfigUnknownFieldsIgnored(t *testing.T) {
 	if cfg.MaxIterations != 5 {
 		t.Errorf("MaxIterations = %d, want 5", cfg.MaxIterations)
 	}
-	if cfg.Inference.BaseURL != "http://localhost:11434/v1" {
-		t.Errorf("Inference.BaseURL = %q, unexpected", cfg.Inference.BaseURL)
+	if cfg.DefaultModel == "" {
+		t.Errorf("DefaultModel is empty after migration from legacy inference config")
 	}
 
 	data, err := json.Marshal(cfg)
@@ -129,8 +117,8 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 		t.Fatalf("unmarshal roundtrip: %v", err)
 	}
 
-	if roundtripped.Inference.BaseURL != cfg.Inference.BaseURL {
-		t.Errorf("Inference.BaseURL mismatch: %q vs %q", roundtripped.Inference.BaseURL, cfg.Inference.BaseURL)
+	if roundtripped.DefaultModel != cfg.DefaultModel {
+		t.Errorf("DefaultModel mismatch: %q vs %q", roundtripped.DefaultModel, cfg.DefaultModel)
 	}
 	if roundtripped.MaxIterations != cfg.MaxIterations {
 		t.Errorf("MaxIterations mismatch: %d vs %d", roundtripped.MaxIterations, cfg.MaxIterations)
@@ -192,14 +180,14 @@ func TestAdversarial_StateCannotMutateConfig(t *testing.T) {
 			t.Errorf("Task section overridden by payload: %q", taskContent)
 		}
 
-		if cfg.Inference.BaseURL != "http://localhost:11434/v1" {
-			t.Error("config.Inference.BaseURL was mutated by adversarial state content")
+		if cfg.DefaultModel == "" {
+			t.Error("config.DefaultModel was cleared by adversarial state content")
 		}
 		if cfg.MaxIterations != 3 {
 			t.Error("config.MaxIterations was mutated by adversarial state content")
 		}
-		if cfg.Arbiter.BaseURL != "" {
-			t.Error("config.Arbiter.BaseURL was set by adversarial state content")
+		if cfg.Arbiter.Model != "" {
+			t.Error("config.Arbiter.Model was set by adversarial state content")
 		}
 	}
 }

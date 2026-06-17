@@ -4,19 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
-type InferenceConfig struct {
-	BaseURL string `json:"base_url"`
-	APIKey  string `json:"api_key,omitempty"`
-	Model   string `json:"model,omitempty"`
-}
-
 type Config struct {
-	Inference        InferenceConfig           `json:"inference"`
-	GeminiAPIKey     string                    `json:"gemini_api_key,omitempty"`
-	Planner          PlannerConfig             `json:"planner"`
+	DefaultModel     string                    `json:"default_model,omitempty"`
+	Planner          RoleConfig                `json:"planner"`
+	Researcher       RoleConfig                `json:"researcher,omitempty"`
 	PollInterval     Duration                  `json:"poll_interval"`
 	MaxIterations    int                       `json:"max_iterations"`
 	MaxCostBudget    int                       `json:"max_cost_budget"`
@@ -32,7 +27,7 @@ type Config struct {
 	Serena           SerenaConfig              `json:"serena"`
 	Sandbox          SandboxConfig             `json:"sandbox,omitempty"`
 	Security         SecurityConfig            `json:"security,omitempty"`
-	Arbiter          ArbiterConfig             `json:"arbiter,omitempty"`
+	Arbiter          RoleConfig                `json:"arbiter,omitempty"`
 	Endpoints        map[string]EndpointConfig `json:"endpoints,omitempty"`
 	Eval             EvalConfig                `json:"eval,omitempty"`
 	Repos            []RepoConfig              `json:"repos"`
@@ -50,6 +45,11 @@ type EndpointConfig struct {
 	OutputPricePerMToken float64 `json:"output_price_per_million_tokens,omitempty"`
 }
 
+// RoleConfig identifies a model for a pipeline role.
+type RoleConfig struct {
+	Model string `json:"model"`
+}
+
 // SandboxConfig holds settings for OpenShell sandbox execution.
 type SandboxConfig struct {
 	Enabled   bool   `json:"enabled"`
@@ -63,27 +63,9 @@ type AppConfig struct {
 	PrivateKeyPath string `json:"private_key_path,omitempty"`
 }
 
-type PlannerConfig struct {
-	BaseURL string `json:"base_url"`
-	Model   string `json:"model"`
-	APIKey  string `json:"api_key,omitempty"`
-}
-
 // SecurityConfig holds security-related settings.
 type SecurityConfig struct {
 	AllowPrivateURLs bool `json:"allow_private_urls"`
-}
-
-type ArbiterConfig struct {
-	BaseURL              string  `json:"base_url"`
-	Model                string  `json:"model"`
-	APIKey               string  `json:"-"`
-	InputPricePerMToken  float64 `json:"input_price_per_million_tokens,omitempty"`
-	OutputPricePerMToken float64 `json:"output_price_per_million_tokens,omitempty"`
-}
-
-func (a ArbiterConfig) Enabled() bool {
-	return a.BaseURL != ""
 }
 
 type SerenaConfig struct {
@@ -106,6 +88,30 @@ func (c *Config) PhaseDuration(phase string) time.Duration {
 		return c.MaxPhaseDuration.Duration
 	}
 	return 15 * time.Minute
+}
+
+// ResolveModel parses a "name@endpoint" spec and resolves the endpoint.
+// Bare names (no @) inherit the endpoint from DefaultModel.
+func (c *Config) ResolveModel(spec string) (model, baseURL, apiKey string, err error) {
+	if spec == "" {
+		return "", "", "", fmt.Errorf("empty model spec")
+	}
+	name, epName, hasEndpoint := strings.Cut(spec, "@")
+	if name == "" {
+		return "", "", "", fmt.Errorf("empty model name in spec %q", spec)
+	}
+	if !hasEndpoint {
+		_, defaultEP, hasDefault := strings.Cut(c.DefaultModel, "@")
+		if !hasDefault || defaultEP == "" {
+			return "", "", "", fmt.Errorf("model %q has no @endpoint and default_model has no endpoint to inherit", spec)
+		}
+		epName = defaultEP
+	}
+	ep, ok := c.Endpoints[epName]
+	if !ok {
+		return "", "", "", fmt.Errorf("unknown endpoint %q (from model spec %q)", epName, spec)
+	}
+	return name, ep.BaseURL, ep.APIKey, nil
 }
 
 // EvalConfig holds settings for the golden-set eval runner.
@@ -152,6 +158,89 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
 
+type legacyConfig struct {
+	Inference struct {
+		BaseURL string `json:"base_url"`
+		Model   string `json:"model"`
+	} `json:"inference"`
+	GeminiAPIKey string `json:"gemini_api_key"`
+	Planner      struct {
+		BaseURL string `json:"base_url"`
+		Model   string `json:"model"`
+	} `json:"planner"`
+	Arbiter struct {
+		BaseURL string `json:"base_url"`
+		Model   string `json:"model"`
+	} `json:"arbiter"`
+}
+
+func findOrCreateEndpoint(endpoints map[string]EndpointConfig, baseURL, preferredName, apiKey string) string {
+	for name, ep := range endpoints {
+		if ep.BaseURL == baseURL {
+			if apiKey != "" && ep.APIKey == "" {
+				ep.APIKey = apiKey
+				endpoints[name] = ep
+			}
+			return name
+		}
+	}
+	endpoints[preferredName] = EndpointConfig{BaseURL: baseURL, APIKey: apiKey}
+	return preferredName
+}
+
+func migrateConfig(cfg *Config, data []byte) {
+	var legacy legacyConfig
+	_ = json.Unmarshal(data, &legacy)
+
+	if cfg.DefaultModel != "" {
+		return
+	}
+
+	if legacy.Inference.BaseURL == "" {
+		return
+	}
+
+	if cfg.Endpoints == nil {
+		cfg.Endpoints = make(map[string]EndpointConfig)
+	}
+
+	infKey := os.Getenv("INFERENCE_API_KEY")
+	epName := findOrCreateEndpoint(cfg.Endpoints, legacy.Inference.BaseURL, "ollama", infKey)
+	model := legacy.Inference.Model
+	if model == "" {
+		model = "qwen2.5-coder:14b"
+	}
+	cfg.DefaultModel = model + "@" + epName
+
+	if legacy.Planner.BaseURL != "" {
+		planKey := os.Getenv("PLANNER_API_KEY")
+		planEP := findOrCreateEndpoint(cfg.Endpoints, legacy.Planner.BaseURL, "planner-ep", planKey)
+		if legacy.Planner.Model != "" {
+			cfg.Planner = RoleConfig{Model: legacy.Planner.Model + "@" + planEP}
+		}
+	}
+
+	if legacy.Arbiter.BaseURL != "" {
+		arbKey := os.Getenv("ARBITER_API_KEY")
+		arbEP := findOrCreateEndpoint(cfg.Endpoints, legacy.Arbiter.BaseURL, "arbiter-ep", arbKey)
+		if legacy.Arbiter.Model != "" {
+			cfg.Arbiter = RoleConfig{Model: legacy.Arbiter.Model + "@" + arbEP}
+		}
+	}
+
+	if legacy.GeminiAPIKey != "" || os.Getenv("GEMINI_API_KEY") != "" {
+		gemKey := legacy.GeminiAPIKey
+		if v := os.Getenv("GEMINI_API_KEY"); v != "" {
+			gemKey = v
+		}
+		gemURL := "https://generativelanguage.googleapis.com/v1beta/openai"
+		gemEP := findOrCreateEndpoint(cfg.Endpoints, gemURL, "gemini", gemKey)
+		if cfg.Researcher.Model == "" {
+			cfg.Researcher = RoleConfig{Model: "gemini-2.5-flash@" + gemEP}
+		}
+	}
+}
+
 func LoadConfig(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -159,7 +248,6 @@ func LoadConfig(path string) (Config, error) {
 	}
 
 	cfg := Config{
-		Inference:        InferenceConfig{BaseURL: "http://localhost:11434/v1"},
 		PollInterval:     Duration{30 * time.Second},
 		MaxIterations:    3,
 		MaxCostBudget:    100000,
@@ -192,21 +280,7 @@ func LoadConfig(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
 
-	if v := os.Getenv("INFERENCE_API_KEY"); v != "" {
-		cfg.Inference.APIKey = v
-	}
-
-	if v := os.Getenv("GEMINI_API_KEY"); v != "" {
-		cfg.GeminiAPIKey = v
-	}
-
-	if v := os.Getenv("PLANNER_API_KEY"); v != "" {
-		cfg.Planner.APIKey = v
-	}
-
-	if v := os.Getenv("ARBITER_API_KEY"); v != "" {
-		cfg.Arbiter.APIKey = v
-	}
+	migrateConfig(&cfg, data)
 
 	for name, ep := range cfg.Endpoints {
 		if ep.APIKeyEnv != "" {
@@ -253,6 +327,19 @@ func LoadConfig(path string) (Config, error) {
 		}
 	}
 
+	for label, spec := range map[string]string{
+		"default_model":    cfg.DefaultModel,
+		"planner.model":    cfg.Planner.Model,
+		"researcher.model": cfg.Researcher.Model,
+		"arbiter.model":    cfg.Arbiter.Model,
+	} {
+		if spec != "" {
+			if _, _, _, err := cfg.ResolveModel(spec); err != nil {
+				return Config{}, fmt.Errorf("%s: %w", label, err)
+			}
+		}
+	}
+
 	if cfg.Sandbox.Enabled {
 		if cfg.Sandbox.PolicyDir == "" {
 			return Config{}, fmt.Errorf("sandbox.policy_dir is required when sandbox is enabled")
@@ -260,10 +347,6 @@ func LoadConfig(path string) (Config, error) {
 		if cfg.Sandbox.Image == "" {
 			return Config{}, fmt.Errorf("sandbox.image is required when sandbox is enabled")
 		}
-	}
-
-	if cfg.Arbiter.BaseURL != "" && cfg.Arbiter.Model == "" {
-		return Config{}, fmt.Errorf("arbiter.model is required when arbiter.base_url is set")
 	}
 
 	return cfg, nil

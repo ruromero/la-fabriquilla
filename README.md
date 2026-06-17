@@ -1,11 +1,11 @@
 # la-fabriquilla
 
-Autonomous software development orchestrator. Polls GitHub issues tagged `fabriquilla:ready`, drives them through a phased pipeline using local LLMs (Ollama) and Gemini, and opens PRs with the results.
+Autonomous software development orchestrator. Polls GitHub issues tagged `fabriquilla:ready`, drives them through a phased pipeline using local LLMs via any OpenAI-compatible API, and opens PRs with the results.
 
 ## Pipeline
 
-1. **Research** — Gemini API for external context gathering
-2. **Plan** — configurable model via any OpenAI-compatible API (Gemini, DeepSeek, MiniMax, etc.) decomposes the issue into an implementation plan
+1. **Research** — configurable model (e.g. Gemini) for external context gathering
+2. **Plan** — configurable model via any OpenAI-compatible API (Gemini, DeepSeek, etc.) decomposes the issue into an implementation plan
 3. **Design** — qwen3:14b produces API contracts, data models, file structure *(not yet wired)*
 4. **Code** — qwen3:14b + Serena MCP (LSP tools) writes the implementation *(not yet wired)*
 5. **Review** — qwen3:14b (correctness + security + intent) + Qodo (GitHub AI reviewer) *(not yet wired)*
@@ -18,7 +18,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed data flow and package layout
 - k3s cluster with [Ollama](https://ollama.com) deployed (GPU access)
 - Models pulled: `qwen3:14b`
 - GitHub App installed on target repos (recommended), or a GitHub PAT
-- Gemini API key (free tier)
+- API keys for any remote endpoints (Gemini, DeepSeek, etc.)
 
 ## Quick start
 
@@ -32,7 +32,9 @@ cp config.example.json config.json
 
 # Credentials via env vars (never in config)
 export GITHUB_APP_PRIVATE_KEY_PATH=/etc/fabriquilla/github-app.pem
+# API keys referenced by api_key_env in endpoint configs
 export GEMINI_API_KEY=your-key
+export DEEPSEEK_API_KEY=your-key
 
 # Run the dispatcher (invokes phase binaries as subprocesses)
 ./bin/dispatcher -config config.json
@@ -81,10 +83,10 @@ If `app_id` is not set, the orchestrator falls back to a static token:
 
 ## Configuration
 
-The orchestrator supports multiple repos in a single instance. Credentials are loaded from env vars, not the config file:
+The orchestrator supports multiple repos in a single instance. All inference endpoints are defined in a shared `endpoints` registry. Models reference endpoints with `name@endpoint` syntax. Credentials are loaded from env vars referenced by `api_key_env`, not stored in the config file:
 
-- `GEMINI_API_KEY` — Gemini API key
-- `PLANNER_API_KEY` — API key for the planner's OpenAI-compatible endpoint
+- `GEMINI_API_KEY` — Gemini API key (referenced by `api_key_env` in endpoint config)
+- `DEEPSEEK_API_KEY` — DeepSeek API key
 - `GITHUB_APP_PRIVATE_KEY_PATH` — fallback path to a GitHub App `.pem` file
 - `FABRIQUILLA_DISPATCHER_KEY_PATH` — dispatcher app private key path
 - `FABRIQUILLA_WORKER_KEY_PATH` — worker app private key path
@@ -92,14 +94,18 @@ The orchestrator supports multiple repos in a single instance. Credentials are l
 
 ```json
 {
-  "ollama_url": "http://ollama.ai.svc.cluster.local:11434",
+  "default_model": "qwen2.5-coder:14b@ollama",
+  "planner": {"model": "gemini-2.5-flash@gemini"},
+  "researcher": {"model": "gemini-2.5-flash@gemini"},
+  "arbiter": {"model": "deepseek-chat@deepseek"},
+  "endpoints": {
+    "ollama": {"base_url": "http://ollama.ai.svc.cluster.local:11434/v1"},
+    "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key_env": "GEMINI_API_KEY"},
+    "deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"}
+  },
   "poll_interval": "30s",
   "max_iterations": 3,
   "shadow_mode": true,
-  "planner": {
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-    "model": "gemini-2.5-flash"
-  },
   "apps": {
     "dispatcher": {"app_id": 111111, "installation_id": 222222},
     "worker": {"app_id": 333333, "installation_id": 444444},
@@ -144,11 +150,11 @@ The planner receives `README.md`, `ARCHITECTURE.md`, and `CONVENTIONS.md` as con
 In Kubernetes, credentials are injected via Secrets — never baked into images or ConfigMaps:
 
 ```yaml
-# Secret with the PEM, Gemini key, and planner key
+# Secret with the PEM and API keys
 kubectl create secret generic fabriquilla-creds \
   --from-file=github-app.pem=/path/to/key.pem \
   --from-literal=GEMINI_API_KEY=your-key \
-  --from-literal=PLANNER_API_KEY=your-planner-key
+  --from-literal=DEEPSEEK_API_KEY=your-key
 
 # Mount PEM as a volume, Gemini key as env var
 # See Dockerfile for the scratch-based image

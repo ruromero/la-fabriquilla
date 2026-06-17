@@ -17,7 +17,13 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
+	_, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	if err != nil {
+		slog.Error("resolve default model", "error", err)
+		os.Exit(1)
+	}
+
+	cl := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
 	gh := helpers.MustGitHubClientForApp(cfg, "worker", state)
 
 	ctx := context.Background()

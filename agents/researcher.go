@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ruromero/la-fabriquilla/gemini"
+	"github.com/ruromero/la-fabriquilla/inference"
 )
-
-const researchModel = "gemini-2.5-flash"
 
 const researchPrompt = `You are a research assistant for a software development team. Given a GitHub issue and the project's tech stack, research and gather relevant context that will help a developer implement it.
 
@@ -35,14 +33,14 @@ type ResearchResult struct {
 	Model        string
 }
 
-func Research(ctx context.Context, gem *gemini.Client, issueTitle, issueBody, techContext string) (string, error) {
-	r, err := ResearchWithUsage(ctx, gem, issueTitle, issueBody, techContext)
+func Research(ctx context.Context, cl *inference.Client, model, issueTitle, issueBody, techContext string) (string, error) {
+	r, err := ResearchWithUsage(ctx, cl, model, issueTitle, issueBody, techContext)
 	return r.Content, err
 }
 
 // ResearchWithUsage works like Research but also returns token usage metadata.
-func ResearchWithUsage(ctx context.Context, gem *gemini.Client, issueTitle, issueBody, techContext string) (ResearchResult, error) {
-	if gem == nil {
+func ResearchWithUsage(ctx context.Context, cl *inference.Client, model, issueTitle, issueBody, techContext string) (ResearchResult, error) {
+	if cl == nil {
 		return ResearchResult{}, nil
 	}
 
@@ -52,14 +50,14 @@ func ResearchWithUsage(ctx context.Context, gem *gemini.Client, issueTitle, issu
 	}
 
 	prompt := fmt.Sprintf(researchPrompt, stackSection, issueTitle, issueBody)
-	result, usage, err := gem.GenerateWithUsage(ctx, researchModel, prompt)
+	content, usage, err := cl.SimpleChat(ctx, model, "", prompt)
 	if err != nil {
 		return ResearchResult{}, fmt.Errorf("research: %w", err)
 	}
 	return ResearchResult{
-		Content:      result,
+		Content:      content,
 		PromptTokens: usage.PromptTokens,
 		CompTokens:   usage.CompletionTokens,
-		Model:        researchModel,
+		Model:        model,
 	}, nil
 }

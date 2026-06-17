@@ -19,12 +19,13 @@ import (
 
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
-	if cfg.Inference.Model == "" {
-		slog.Error("inference.model is required in config")
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	if err != nil {
+		slog.Error("resolve default model", "error", err)
 		os.Exit(1)
 	}
 
-	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
+	cl := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
 	ctx := context.Background()
 
 	var sess *harness.SerenaSession
@@ -53,7 +54,7 @@ func main() {
 	feedback := pipeline.FormatReviewFeedback(effective)
 
 	start := time.Now()
-	iterResult, err := agents.IterateWithUsage(ctx, cl, cfg.Inference.Model, state.Code, feedback, tools, handler)
+	iterResult, err := agents.IterateWithUsage(ctx, cl, model, state.Code, feedback, tools, handler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("iterate phase failed", "error", err)

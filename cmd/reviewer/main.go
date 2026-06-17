@@ -19,7 +19,12 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	cl := inference.NewClient(cfg.Inference.BaseURL, inference.WithAPIKey(cfg.Inference.APIKey))
+	_, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	if err != nil {
+		slog.Error("resolve default model", "error", err)
+		os.Exit(1)
+	}
+	cl := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
 	ctx := context.Background()
 
 	var sess *harness.SerenaSession
@@ -70,12 +75,17 @@ func main() {
 		Findings: rev.Findings,
 	}
 
-	if !cfg.Arbiter.Enabled() {
+	if cfg.Arbiter.Model == "" {
 		state.ArbiterResult = nil
 	}
 
-	if cfg.Arbiter.Enabled() {
-		arbCl := inference.NewClient(cfg.Arbiter.BaseURL, inference.WithAPIKey(cfg.Arbiter.APIKey))
+	if cfg.Arbiter.Model != "" {
+		arbModel, arbURL, arbKey, arbErr := cfg.ResolveModel(cfg.Arbiter.Model)
+		if arbErr != nil {
+			slog.Error("resolve arbiter model", "error", arbErr)
+			os.Exit(1)
+		}
+		arbCl := inference.NewClient(arbURL, inference.WithAPIKey(arbKey))
 
 		var dismissedKeys []string
 		if state.ArbiterResult != nil {
@@ -83,12 +93,12 @@ func main() {
 		}
 
 		arbStart := time.Now()
-		arb, arbErr := agents.Arbitrate(ctx, arbCl, cfg.Arbiter.Model,
+		arb, arbErr2 := agents.Arbitrate(ctx, arbCl, arbModel,
 			rev.Findings, state.Conventions, state.Summaries, state.PlanContent,
 			dismissedKeys)
 		arbElapsed := time.Since(arbStart)
-		if arbErr != nil {
-			slog.Warn("arbiter phase failed, falling back to severity-based review", "error", arbErr)
+		if arbErr2 != nil {
+			slog.Warn("arbiter phase failed, falling back to severity-based review", "error", arbErr2)
 			state.ArbiterResult = nil
 			state.Phase = "review-done"
 			helpers.MustSaveState(state)
