@@ -140,9 +140,11 @@ func main() {
 			}
 			arbURL := ""
 			arbKey := ""
+			arbModelName := ""
 			if cfg.Arbiter.Model != "" {
-				_, u, k, err := cfg.ResolveModel(cfg.Arbiter.Model)
+				m, u, k, err := cfg.ResolveModel(cfg.Arbiter.Model)
 				if err == nil {
+					arbModelName = m
 					arbURL = u
 					arbKey = k
 				}
@@ -153,7 +155,7 @@ func main() {
 			}
 			if arbURL != "" {
 				a.arbClient = inference.NewClient(arbURL, inference.WithAPIKey(arbKey))
-				a.arbModel = spec.name
+				a.arbModel = arbModelName
 			}
 			configureJudge(a, cfg, *judgeBaseURL, *judgeModel)
 

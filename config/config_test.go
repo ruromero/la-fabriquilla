@@ -179,7 +179,10 @@ func TestArbiterConfigValidation(t *testing.T) {
 		path := filepath.Join(dir, "config.json")
 		data := `{
 			"default_model": "qwen2.5-coder:14b@ollama",
-			"endpoints": {"ollama": {"base_url": "http://localhost:11434/v1"}},
+			"endpoints": {
+				"ollama": {"base_url": "http://localhost:11434/v1"},
+				"deepseek": {"base_url": "https://api.deepseek.com/v1"}
+			},
 			"arbiter": {"model": "deepseek-chat@deepseek"}
 		}`
 		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
@@ -202,6 +205,23 @@ func TestArbiterConfigValidation(t *testing.T) {
 		}
 		if _, err := LoadConfig(path); err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("model referencing unknown endpoint fails at load", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "config.json")
+		data := `{
+			"default_model": "qwen2.5-coder:14b@ollama",
+			"endpoints": {"ollama": {"base_url": "http://localhost:11434/v1"}},
+			"arbiter": {"model": "deepseek-chat@nonexistent"}
+		}`
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := LoadConfig(path)
+		if err == nil {
+			t.Fatal("expected error for arbiter referencing unknown endpoint")
 		}
 	})
 }
@@ -278,6 +298,7 @@ func TestResolveModel(t *testing.T) {
 		{name: "full default_model spec", spec: "qwen2.5-coder:14b@ollama", model: "qwen2.5-coder:14b", baseURL: "http://localhost:11434/v1", apiKey: ""},
 		{name: "unknown endpoint errors", spec: "model@nonexistent", wantErr: true},
 		{name: "empty spec errors", spec: "", wantErr: true},
+		{name: "empty model name errors", spec: "@ollama", wantErr: true},
 	}
 
 	for _, tt := range tests {

@@ -97,6 +97,9 @@ func (c *Config) ResolveModel(spec string) (model, baseURL, apiKey string, err e
 		return "", "", "", fmt.Errorf("empty model spec")
 	}
 	name, epName, hasEndpoint := strings.Cut(spec, "@")
+	if name == "" {
+		return "", "", "", fmt.Errorf("empty model name in spec %q", spec)
+	}
 	if !hasEndpoint {
 		_, defaultEP, hasDefault := strings.Cut(c.DefaultModel, "@")
 		if !hasDefault || defaultEP == "" {
@@ -320,6 +323,19 @@ func LoadConfig(path string) (Config, error) {
 			if app.PrivateKeyPath == "" {
 				app.PrivateKeyPath = globalKeyPath
 				cfg.Apps[role] = app
+			}
+		}
+	}
+
+	for label, spec := range map[string]string{
+		"default_model":    cfg.DefaultModel,
+		"planner.model":    cfg.Planner.Model,
+		"researcher.model": cfg.Researcher.Model,
+		"arbiter.model":    cfg.Arbiter.Model,
+	} {
+		if spec != "" {
+			if _, _, _, err := cfg.ResolveModel(spec); err != nil {
+				return Config{}, fmt.Errorf("%s: %w", label, err)
 			}
 		}
 	}
