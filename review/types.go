@@ -43,6 +43,15 @@ type PRComment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// PRReview represents a GitHub pull request review submission.
+type PRReview struct {
+	ID          int       `json:"id"`
+	Body        string    `json:"body"`
+	State       string    `json:"state"` // APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED, PENDING
+	User        string    `json:"user"`
+	SubmittedAt time.Time `json:"submitted_at"`
+}
+
 type PRCommentClient interface {
 	CreateComment(ctx context.Context, issueNumber int, body string) error
 	// ListPRComments returns issue-level comments (GET /repos/{owner}/{repo}/issues/{number}/comments).
@@ -51,4 +60,7 @@ type PRCommentClient interface {
 	// ListPRReviewComments returns pull-request review comments attached to diff lines
 	// (GET /repos/{owner}/{repo}/pulls/{number}/comments). Qodo posts inline findings here.
 	ListPRReviewComments(ctx context.Context, prNumber int) ([]PRComment, error)
+	// ListPRReviews returns pull request review submissions
+	// (GET /repos/{owner}/{repo}/pulls/{number}/reviews). Used by HumanAdapter to detect CHANGES_REQUESTED.
+	ListPRReviews(ctx context.Context, prNumber int) ([]PRReview, error)
 }

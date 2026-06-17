@@ -33,6 +33,25 @@ func (rc *ReviewClient) CreateComment(ctx context.Context, issueNumber int, body
 	return rc.Client.CreateComment(ctx, issueNumber, body)
 }
 
+// ListPRReviews returns pull request review submissions (pulls reviews API).
+func (rc *ReviewClient) ListPRReviews(ctx context.Context, prNumber int) ([]review.PRReview, error) {
+	reviews, err := rc.Client.ListPRReviews(ctx, prNumber)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]review.PRReview, len(reviews))
+	for i, r := range reviews {
+		result[i] = review.PRReview{
+			ID:          r.ID,
+			Body:        r.Body,
+			State:       r.State,
+			User:        r.User.Login,
+			SubmittedAt: r.SubmittedAt,
+		}
+	}
+	return result, nil
+}
+
 func toPRComments(comments []Comment) []review.PRComment {
 	result := make([]review.PRComment, len(comments))
 	for i, c := range comments {

@@ -177,6 +177,27 @@ func (c *Client) ListPRReviewComments(ctx context.Context, prNumber int) ([]Comm
 	return comments, nil
 }
 
+// PRReview represents a GitHub pull request review.
+type PRReview struct {
+	ID   int    `json:"id"`
+	Body string `json:"body"`
+	// State is one of APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED, PENDING.
+	State string `json:"state"`
+	User  struct {
+		Login string `json:"login"`
+	} `json:"user"`
+	SubmittedAt time.Time `json:"submitted_at"`
+}
+
+func (c *Client) ListPRReviews(ctx context.Context, prNumber int) ([]PRReview, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/reviews", c.owner, c.repo, prNumber)
+	var reviews []PRReview
+	if err := c.get(ctx, url, &reviews); err != nil {
+		return nil, fmt.Errorf("list pr reviews: %w", err)
+	}
+	return reviews, nil
+}
+
 func (c *Client) CreateIssue(ctx context.Context, title, body string, labels []string) (Issue, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues", c.owner, c.repo)
 	payload := map[string]any{
