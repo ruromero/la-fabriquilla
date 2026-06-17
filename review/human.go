@@ -88,11 +88,18 @@ func parseHumanComment(body string) ReviewFinding {
 	if idx := strings.IndexByte(title, '\n'); idx >= 0 {
 		title = title[:idx]
 	}
-	// Truncate long titles
+	title = strings.TrimSpace(title)
+	if title == "" {
+		trimmed := strings.TrimSpace(body)
+		if idx := strings.IndexByte(trimmed, '\n'); idx >= 0 {
+			title = trimmed[:idx]
+		} else {
+			title = trimmed
+		}
+	}
 	if len(title) > 120 {
 		title = title[:117] + "..."
 	}
-	title = strings.TrimSpace(title)
 
 	return ReviewFinding{
 		Source:   "human",

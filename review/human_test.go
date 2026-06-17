@@ -215,6 +215,13 @@ func TestParseHumanComment(t *testing.T) {
 			t.Errorf("detail = %q, want full body", f.Detail)
 		}
 	})
+
+	t.Run("leading newline falls back to first non-empty line", func(t *testing.T) {
+		f := parseHumanComment("\nActual content here")
+		if f.Title != "Actual content here" {
+			t.Errorf("title = %q, want %q", f.Title, "Actual content here")
+		}
+	})
 }
 
 func TestIsBot(t *testing.T) {
