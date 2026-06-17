@@ -10,6 +10,7 @@ import (
 type mockPRCommentClient struct {
 	comments       []PRComment
 	reviewComments []PRComment
+	reviews        []PRReview
 	created        []string
 }
 
@@ -24,6 +25,10 @@ func (m *mockPRCommentClient) ListPRComments(_ context.Context, _ int) ([]PRComm
 
 func (m *mockPRCommentClient) ListPRReviewComments(_ context.Context, _ int) ([]PRComment, error) {
 	return m.reviewComments, nil
+}
+
+func (m *mockPRCommentClient) ListPRReviews(_ context.Context, _ int) ([]PRReview, error) {
+	return m.reviews, nil
 }
 
 func TestQodoAdapter_TriggerReview(t *testing.T) {
