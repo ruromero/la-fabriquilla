@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -175,26 +174,14 @@ func TestSecurityConfigRoundTrip(t *testing.T) {
 }
 
 func TestArbiterConfigValidation(t *testing.T) {
-	t.Run("base_url without model fails", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "config.json")
-		data := `{"arbiter":{"base_url":"https://api.deepseek.com/v1"}}`
-		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
-			t.Fatal(err)
-		}
-		_, err := LoadConfig(path)
-		if err == nil {
-			t.Fatal("expected error when arbiter.base_url set without model")
-		}
-		if !strings.Contains(err.Error(), "arbiter.model") {
-			t.Errorf("error = %q, want mention of arbiter.model", err)
-		}
-	})
-
 	t.Run("complete arbiter config loads", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "config.json")
-		data := `{"arbiter":{"base_url":"https://api.deepseek.com/v1","model":"deepseek-chat"}}`
+		data := `{
+			"default_model": "qwen2.5-coder:14b@ollama",
+			"endpoints": {"ollama": {"base_url": "http://localhost:11434/v1"}},
+			"arbiter": {"model": "deepseek-chat@deepseek"}
+		}`
 		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -202,10 +189,7 @@ func TestArbiterConfigValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if cfg.Arbiter.BaseURL != "https://api.deepseek.com/v1" {
-			t.Errorf("base_url = %q", cfg.Arbiter.BaseURL)
-		}
-		if cfg.Arbiter.Model != "deepseek-chat" {
+		if cfg.Arbiter.Model != "deepseek-chat@deepseek" {
 			t.Errorf("model = %q", cfg.Arbiter.Model)
 		}
 	})
@@ -225,7 +209,14 @@ func TestArbiterConfigValidation(t *testing.T) {
 func TestArbiterAPIKeyEnvVar(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
-	data := `{"arbiter":{"base_url":"https://api.deepseek.com/v1","model":"deepseek-chat"}}`
+	data := `{
+		"default_model": "qwen2.5-coder:14b@ollama",
+		"endpoints": {
+			"ollama": {"base_url": "http://localhost:11434/v1"},
+			"deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "ARBITER_API_KEY"}
+		},
+		"arbiter": {"model": "deepseek-chat@deepseek"}
+	}`
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -234,8 +225,12 @@ func TestArbiterAPIKeyEnvVar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Arbiter.APIKey != "test-key-123" {
-		t.Errorf("APIKey = %q, want %q", cfg.Arbiter.APIKey, "test-key-123")
+	_, _, apiKey, err := cfg.ResolveModel(cfg.Arbiter.Model)
+	if err != nil {
+		t.Fatalf("ResolveModel: %v", err)
+	}
+	if apiKey != "test-key-123" {
+		t.Errorf("apiKey = %q, want %q", apiKey, "test-key-123")
 	}
 }
 
@@ -257,5 +252,189 @@ func TestEvalConfigDefaults(t *testing.T) {
 	}
 	if cfg.Eval.ResultsDir != "eval-results" {
 		t.Errorf("ResultsDir = %q, want eval-results", cfg.Eval.ResultsDir)
+	}
+}
+
+func TestResolveModel(t *testing.T) {
+	cfg := Config{
+		DefaultModel: "qwen2.5-coder:14b@ollama",
+		Endpoints: map[string]EndpointConfig{
+			"ollama":   {BaseURL: "http://localhost:11434/v1"},
+			"deepseek": {BaseURL: "https://api.deepseek.com/v1", APIKey: "dk-test"},
+			"gemini":   {BaseURL: "https://generativelanguage.googleapis.com/v1beta/openai", APIKey: "gem-test"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		spec    string
+		model   string
+		baseURL string
+		apiKey  string
+		wantErr bool
+	}{
+		{name: "explicit endpoint", spec: "deepseek-chat@deepseek", model: "deepseek-chat", baseURL: "https://api.deepseek.com/v1", apiKey: "dk-test"},
+		{name: "bare name inherits default endpoint", spec: "qwen3:14b", model: "qwen3:14b", baseURL: "http://localhost:11434/v1", apiKey: ""},
+		{name: "full default_model spec", spec: "qwen2.5-coder:14b@ollama", model: "qwen2.5-coder:14b", baseURL: "http://localhost:11434/v1", apiKey: ""},
+		{name: "unknown endpoint errors", spec: "model@nonexistent", wantErr: true},
+		{name: "empty spec errors", spec: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model, baseURL, apiKey, err := cfg.ResolveModel(tt.spec)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if model != tt.model {
+				t.Errorf("model = %q, want %q", model, tt.model)
+			}
+			if baseURL != tt.baseURL {
+				t.Errorf("baseURL = %q, want %q", baseURL, tt.baseURL)
+			}
+			if apiKey != tt.apiKey {
+				t.Errorf("apiKey = %q, want %q", apiKey, tt.apiKey)
+			}
+		})
+	}
+}
+
+func TestResolveModelBareDefaultErrors(t *testing.T) {
+	cfg := Config{
+		DefaultModel: "qwen3:14b",
+		Endpoints:    map[string]EndpointConfig{"ollama": {BaseURL: "http://localhost:11434/v1"}},
+	}
+	_, _, _, err := cfg.ResolveModel("some-model")
+	if err == nil {
+		t.Fatal("expected error when default_model has no @endpoint and spec is bare")
+	}
+}
+
+func TestLoadConfigMigratesLegacyInference(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	data := `{
+		"inference": {"base_url": "http://localhost:11434/v1", "model": "qwen3:14b"},
+		"planner": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "model": "gemini-2.5-flash"},
+		"arbiter": {"base_url": "https://api.deepseek.com/v1", "model": "deepseek-chat"}
+	}`
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("INFERENCE_API_KEY", "inf-key")
+	t.Setenv("PLANNER_API_KEY", "plan-key")
+	t.Setenv("ARBITER_API_KEY", "arb-key")
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.DefaultModel == "" {
+		t.Fatal("DefaultModel not migrated")
+	}
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	if err != nil {
+		t.Fatalf("resolve default: %v", err)
+	}
+	if model != "qwen3:14b" {
+		t.Errorf("default model = %q, want qwen3:14b", model)
+	}
+	if baseURL != "http://localhost:11434/v1" {
+		t.Errorf("default baseURL = %q", baseURL)
+	}
+	if apiKey != "inf-key" {
+		t.Errorf("default apiKey = %q", apiKey)
+	}
+
+	model, baseURL, apiKey, err = cfg.ResolveModel(cfg.Planner.Model)
+	if err != nil {
+		t.Fatalf("resolve planner: %v", err)
+	}
+	if model != "gemini-2.5-flash" {
+		t.Errorf("planner model = %q", model)
+	}
+	if apiKey != "plan-key" {
+		t.Errorf("planner apiKey = %q", apiKey)
+	}
+	_ = baseURL
+
+	model, _, apiKey, err = cfg.ResolveModel(cfg.Arbiter.Model)
+	if err != nil {
+		t.Fatalf("resolve arbiter: %v", err)
+	}
+	if model != "deepseek-chat" {
+		t.Errorf("arbiter model = %q", model)
+	}
+	if apiKey != "arb-key" {
+		t.Errorf("arbiter apiKey = %q", apiKey)
+	}
+}
+
+func TestLoadConfigMigratesGeminiAPIKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	data := `{"inference": {"base_url": "http://localhost:11434/v1", "model": "qwen3:14b"}}`
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GEMINI_API_KEY", "gem-key")
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Researcher.Model == "" {
+		t.Fatal("Researcher.Model not migrated")
+	}
+	_, baseURL, apiKey, err := cfg.ResolveModel(cfg.Researcher.Model)
+	if err != nil {
+		t.Fatalf("resolve researcher: %v", err)
+	}
+	if baseURL != "https://generativelanguage.googleapis.com/v1beta/openai" {
+		t.Errorf("researcher baseURL = %q", baseURL)
+	}
+	if apiKey != "gem-key" {
+		t.Errorf("researcher apiKey = %q", apiKey)
+	}
+}
+
+func TestLoadConfigNewSchemaPassthrough(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	data := `{
+		"default_model": "qwen2.5-coder:14b@ollama",
+		"planner": {"model": "gemini-2.5-flash@gemini"},
+		"arbiter": {"model": "deepseek-chat@deepseek"},
+		"endpoints": {
+			"ollama": {"base_url": "http://localhost:11434/v1"},
+			"deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"},
+			"gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key_env": "GEMINI_API_KEY"}
+		}
+	}`
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEEPSEEK_API_KEY", "dk-123")
+	t.Setenv("GEMINI_API_KEY", "gem-456")
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.DefaultModel != "qwen2.5-coder:14b@ollama" {
+		t.Errorf("DefaultModel = %q", cfg.DefaultModel)
+	}
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.Arbiter.Model)
+	if err != nil {
+		t.Fatalf("resolve arbiter: %v", err)
+	}
+	if model != "deepseek-chat" || baseURL != "https://api.deepseek.com/v1" || apiKey != "dk-123" {
+		t.Errorf("arbiter got model=%q url=%q key=%q", model, baseURL, apiKey)
 	}
 }
