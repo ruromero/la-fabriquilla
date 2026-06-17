@@ -27,12 +27,13 @@ cmd/
   designer/main.go       one-shot: technical design via Ollama
   coder/main.go          one-shot: code generation via Ollama + Serena
   committer/main.go      one-shot: branch, commit, PR creation, merge
+  reviewer/main.go       one-shot: 3-pass review + arbiter classification
+  iterator/main.go       one-shot: apply review feedback via Ollama + Serena
   eval/main.go           golden-set evaluation harness
+  eval-runner/main.go    model comparison eval runner (name@endpoint syntax)
   internal/helpers.go    shared helpers (config/state loading, GitHub client)
 
   ### Planned binaries (not yet implemented)
-  reviewer/main.go       one-shot: factory review + arbiter (DeepSeek API)
-  iterator/main.go       one-shot: apply review feedback via Ollama + Serena
   feedback/main.go       one-shot: external review loop + feedback capture
   dashboard/main.go      web UI: config, monitoring, reports, control
     frontend/            React app (embedded via embed.FS)
@@ -59,7 +60,7 @@ traces/      Structured JSON trace logging (minimal)
 ### Build
 
 ```makefile
-BINARIES := dispatcher gatherer researcher planner designer coder committer eval
+BINARIES := dispatcher gatherer researcher planner designer coder committer reviewer iterator eval eval-runner
 
 build: $(BINARIES)
 
@@ -268,45 +269,40 @@ deploy/sandbox-images/
 
 ### Current state
 
-Review logic lives in `agents/reviewer.go` as a pure function that runs
-three review passes (correctness, security, intent alignment) via Ollama.
-
-### Planned: Multi-source review with arbiter
-
-Three independent review sources feeding into a central arbiter:
+Review is a multi-source pipeline with arbiter classification:
 
 ```
-Factory reviewer (sandbox, DeepSeek API)
-  Independent review with full project context
+Factory reviewer (reviewer binary, 3-pass via Ollama)
+  Correctness, security, intent alignment passes
   Produces structured ReviewFinding[]
 
-External reviewer (pluggable — Qodo today)
+External reviewer (pluggable — Qodo shipped)
   Parsed through ExternalReviewAdapter interface
-  Produces structured ReviewFinding[]
-
-Human reviewer (via GitHub PR reviews)
-  Parsed through same adapter interface
   Produces structured ReviewFinding[]
 
         ↓ all findings ↓
 
-Arbiter (part of reviewer binary, DeepSeek API)
+Arbiter (part of reviewer binary, configurable endpoint e.g. DeepSeek)
   Classifies each → fix_here | subtask | root_cause | dismissed
   Produces ArbiterResult
 ```
 
-### Planned: Pluggable external reviewer
+### Pluggable external reviewer
+
+The `ExternalReviewAdapter` interface and `QodoAdapter` are implemented
+in the `review/` package:
 
 ```go
 type ExternalReviewAdapter interface {
-    ParseFindings(ctx context.Context, comments []github.Comment) ([]ReviewFinding, error)
+    ParseFindings(ctx context.Context, client PRCommentClient, prNumber int) ([]ReviewFinding, error)
     TriggerReview(ctx context.Context, gh *github.Client, prNumber int) error
     ReviewReady(ctx context.Context, comments []github.Comment) bool
 }
 ```
 
-Adapters: `QodoAdapter` (parse `/agentic_review` output), `HumanAdapter`
-(parse GitHub PR review comments).
+Shipped adapters: `QodoAdapter` (parse `/agentic_review` output).
+
+Planned adapter: `HumanAdapter` (parse GitHub PR review comments).
 
 ### Arbiter behavior
 
@@ -317,7 +313,7 @@ The arbiter classifies each finding:
 - **dismissed**: invalid given project context (with stated reason)
 
 If a finding was dismissed in iteration N and reappears in N+1:
-auto-dismiss to prevent deadlock.
+auto-dismiss to prevent deadlock. This deadlock prevention is shipped.
 
 ---
 
@@ -369,9 +365,10 @@ auto-dismiss to prevent deadlock.
    │     Commits files from State
    │     Opens PR with plan + review in body
    │
-   ├── Phase: Review (current: Ollama; planned: DeepSeek arbiter)
+   ├── Phase: Review (Ollama 3-pass + arbiter via configurable endpoint)
    │     Three passes: correctness, security, intent
-   │     Output: review findings → State
+   │     Arbiter classifies findings → fix_here/subtask/root_cause/dismissed
+   │     Output: review findings + arbiter result → State
    │
    ├── Phase: Iterate (applies review feedback, loops to review)
    │
@@ -405,9 +402,9 @@ No guardrail depends on LLM judgment.
 
 | Guardrail | Default | Enforcement point |
 |---|---|---|
-| max_iterations | 3 | per review cycle |
-| max_total_iterations | 5 | across all cycles for one issue |
-| max_wall_time | 30m | dispatcher: total processing time per issue |
+| max_iterations | 3 | Review-iterate cycles per issue |
+| max_phase_duration | 15m | Timeout per phase binary |
+| max_phase_retries | 2 | Retry on timeout/signal kill (exponential backoff) |
 
 ### Scope limits
 
@@ -420,7 +417,7 @@ No guardrail depends on LLM judgment.
 
 | Guardrail | Default | Enforcement point |
 |---|---|---|
-| max_api_tokens_per_issue | configurable | dispatcher: cumulative across all phases |
+| max_cost_budget | 100,000 tokens | dispatcher: cumulative across all phases |
 | max_issues_per_hour | 5 | dispatcher: rate limit on processing |
 | max_issues_per_day | 20 | dispatcher: daily cap |
 
@@ -449,10 +446,11 @@ pattern, the committer labels `fabriquilla:needs-human`.
 | max_root_cause_issues_per_pr | 3 | feedback binary |
 | max_root_cause_depth | 1 | dispatcher: root cause issues cannot create root cause issues |
 
-### Planned: Review deadlock prevention
+### Review deadlock prevention
 
-If a finding is dismissed by the arbiter in iteration N and the same
+If a finding was dismissed by the arbiter in iteration N and the same
 finding reappears in iteration N+1: auto-dismiss without re-arbitration.
+This is shipped in `review/arbiter.go`.
 
 ---
 
@@ -549,7 +547,8 @@ tests/golden/
 | Planner | Configurable | OpenAI-compatible API | Supports Gemini, DeepSeek, etc. |
 | Designer | qwen3:14b | Ollama (local) | Structured technical output |
 | Coder | qwen3:14b | Ollama (local) | Tool calling, code generation |
-| Reviewer | qwen3:14b (current) / DeepSeek (planned arbiter) | Ollama / DeepSeek API | High-judgment arbitration deserves stronger model |
+| Reviewer | qwen3:14b (3-pass) | Ollama (local) | Adversarial 3-pass review |
+| Arbiter | Configurable (e.g. DeepSeek) | OpenAI-compatible API | Classifies findings; different family than coder |
 | Iterator | qwen3:14b | Ollama (local) | Apply fixes with Serena tools |
 
 ---
@@ -598,7 +597,7 @@ FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY . .
 RUN for bin in dispatcher gatherer researcher planner designer coder \
-    reviewer iterator committer feedback eval; do \
+    reviewer iterator committer eval eval-runner; do \
       CGO_ENABLED=0 go build -o /out/$bin ./cmd/$bin/; \
     done
 
@@ -668,17 +667,15 @@ fabriquilla:ready → fabriquilla:in-progress → fabriquilla:done
 
 ## Planned Features (Not Yet Implemented)
 
-These sections from the original v2 design are not yet in the codebase:
+These items from the original v2 design are not yet in the codebase:
 
-1. **Human review adapter** (`review/` package) — parse GitHub PR review comments into `ReviewFinding` (ExternalReviewAdapter interface and QodoAdapter are implemented)
-2. **Reviewer binary** (`cmd/reviewer/`) — standalone binary with DeepSeek arbiter
-3. **Iterator binary** (`cmd/iterator/`) — standalone binary for applying review feedback
-4. **Feedback binary** (`cmd/feedback/`) — post-PR review loop and structured feedback capture
-5. **Dashboard** (`cmd/dashboard/`) — web UI for config, monitoring, reports, control
-6. **Self-improvement feedback loop** — structured JSONL logging of review outcomes, periodic analysis
-7. **Scoped installation tokens** — `TokenWithPermissions()` on `AppAuth`
-8. **Post-merge monitoring** — CI watching, automatic revert PR creation
-9. **Merge automation** — committer checks status checks and merges on approval
+1. **Human review adapter** (`review/` package) — parse GitHub PR review comments into `ReviewFinding` via the shipped `ExternalReviewAdapter` interface
+2. **Feedback binary** (`cmd/feedback/`) — post-PR review loop and structured feedback capture
+3. **Dashboard** (`cmd/dashboard/`) — web UI for config, monitoring, reports, control
+4. **Self-improvement feedback loop** — structured JSONL logging of review outcomes, periodic analysis
+5. **Scoped installation tokens** — `TokenWithPermissions()` on `AppAuth`
+6. **Post-merge monitoring** — CI watching, automatic revert PR creation
+7. **Merge automation** — committer checks status checks and merges on approval
 
 ---
 
@@ -709,71 +706,54 @@ architecture with scoped GitHub App identities, OpenShell sandboxing,
 pluggable review, self-improvement feedback loop, comprehensive guardrails,
 and budget control.
 
-### v2.1 — Budget & Resilience
+### v2.1 — Budget & Resilience (complete)
 
-Foundation for autonomous operation within cost bounds.
+- [x] #27 — Extract shared packages
+- [x] #28 — Split into separate binaries
+- [x] #30 — Pipeline state serialization
+- [x] #50 — Instrument API clients for token counting
+- [x] #51 — Retry with backoff + stall detection
+- [x] #52 — Structured output for coder phase
+- [x] #36 — Guardrails in dispatcher and committer
 
-- #27 — Extract shared packages
-- #28 — Split into separate binaries
-- #30 — Pipeline state serialization
-- #50 — Instrument API clients for token counting
-- #51 — Retry with backoff + stall detection
-- #52 — Structured output for coder phase
-- #36 — Guardrails in dispatcher and committer (depends on #50)
+### v2.2 — Sandboxed Execution (complete)
 
-### v2.2 — Sandboxed Execution
+- [x] #29 — Three GitHub Apps
+- [x] #34 — OpenShell sandbox integration (coder-first MVP)
+- [x] #35 — Sandbox images (go + rust + typescript)
+- [x] #53 — MCP credential redaction
+- [x] #54 — SSRF protection for URL-capable tools
 
-Defense in depth for LLM-driven phases.
+### v2.3 — Review & Verification (in progress)
 
-- #29 — Three GitHub Apps
-- #34 — OpenShell sandbox integration (coder-first MVP)
-- #35 — Sandbox images (go + rust + typescript, depends on #34)
-- #53 — MCP credential redaction
-- #54 — SSRF protection for URL-capable tools
+- [x] #31 — Review adapter interface + QodoAdapter
+- [x] #32 — Arbiter phase via OpenAI-compatible API
+- [x] #65 — Review-iterate loop wired into dispatcher
+- [ ] #33 — Feedback binary with structured logging
+- [ ] #39 — Human review adapter + merge automation (deferred until eval evidence)
 
-### v2.3 — Review & Verification
+### Testing & Validation (in progress)
 
-Pluggable multi-model review pipeline.
+- [x] #74 — Prompt injection adversarial corpus
+- [x] #76 — Golden-set eval cases for all phases
+- [x] #78 — Security boundary unit tests
+- [ ] #73 — Wire eval framework to real inference
+- [ ] #79 — Contract tests with recorded fixtures
+- [ ] #80 — Trace audit for credential leakage
+- [ ] #77 — End-to-end smoke test
 
-- #31 — Review adapter interface + QodoAdapter
-- #32 — Arbiter phase / DeepSeek (depends on #31)
-- #33 — Feedback binary with structured logging (depends on #32)
-- #39 — Human review adapter + merge automation (depends on #31, #33)
+### v2.5 — Agent Quality (open)
 
-### v2.4 — Observability & Feedback Loop
+Smarter cognition inside existing privilege boundaries — no sandbox,
+credential, or network-policy changes.
 
-Persistent history, monitoring, self-improvement.
+- [ ] #87 — Designer phase: read-only code navigation tools
+- [ ] #88 — `plan_infeasible` coder outcome with bounded re-plan loop
+- [ ] #89 — Per-repo coder model configuration
 
-- #37 — Golden-set evaluation harness
-- #55 — Persistent run history with SQLite (depends on #50)
-- #56 — Context7 as second MCP server
-- #38 — Post-merge monitoring + auto-revert (depends on #33)
-- #40 — Dashboard: config, monitoring, reports (depends on #33, #55)
+### v2.4 — Observability & Feedback Loop (open)
 
-### Dependency graph
-
-```
-v2.1 Budget & Resilience          v2.2 Sandboxed Execution
-─────────────────────────         ─────────────────────────
-#50 token counting ──┐            #34 OpenShell (coder MVP)
-#51 retry + stall    │              └── #35 sandbox images
-#52 structured output│            #53 MCP credential redact
-                     │            #54 SSRF protection
-#36 guardrails ◄─────┘
-        │
-        ▼
-v2.3 Review & Verification       v2.4 Observability & Feedback
-──────────────────────────        ─────────────────────────────
-#31 review adapter                #55 SQLite history ◄── #50
-  └── #32 arbiter                 #56 Context7 MCP
-        └── #33 feedback ────┐    #38 post-merge ◄────── #33
-              └── #39 human  │    #40 dashboard ◄──────── #33, #55
-                             │
-                             └──►
-```
-
-### Execution strategy
-
-- **v2.1 and v2.2 run in parallel** — both are high priority (budget + security)
-- **v2.3 starts when** #36 guardrails land (review loop limits need guardrails)
-- **v2.4 starts when** #33 feedback binary lands (post-merge monitoring and dashboard need it)
+- [ ] #55 — Persistent run history (append-only JSONL store)
+- [ ] #56 — Context7 as second MCP server
+- [ ] #38 — Post-merge monitoring + auto-revert (depends on #33)
+- [ ] #40 — Dashboard: config, monitoring, reports (depends on #33, #55)

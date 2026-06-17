@@ -168,6 +168,7 @@ cmd/
   reviewer/      one-shot: 3-pass code review + arbiter classification
   iterator/      one-shot: apply review feedback via LLM + Serena
   eval/          golden-set evaluation harness
+  eval-runner/   model comparison eval runner (name@endpoint syntax)
   internal/      shared helpers (config/state loading, GitHub client)
 ```
 
@@ -195,7 +196,7 @@ Environment variables tell each binary where to find its inputs:
 ┌─────────────────────────────────────────────────────────────┐
 │                      cmd/ (binaries)                        │
 │  dispatcher  gatherer  researcher  planner  designer        │
-│  coder  committer  reviewer  iterator  eval                 │
+│  coder  committer  reviewer  iterator  eval  eval-runner     │
 │  internal/helpers.go (shared bootstrap)                     │
 └──────────────┬──────────────────────────────────────────────┘
                │ imports
