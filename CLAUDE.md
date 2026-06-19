@@ -12,7 +12,7 @@ iterate) using local LLMs via Ollama and Gemini for research.
 - Inference: Ollama API (local models) + Gemini API (research)
 - MCP: Serena (LSP tools), Context7 (library docs)
 - Deploy: k8s (k3s single-node, no GPU required for this pod)
-- Container registry: Quay.io
+- Container registry: ghcr.io (GitHub Container Registry)
 
 ## Build & Test
 

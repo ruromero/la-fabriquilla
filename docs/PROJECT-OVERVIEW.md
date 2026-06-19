@@ -167,6 +167,7 @@ cmd/
   committer/     one-shot: branch, commit, PR creation
   reviewer/      one-shot: 3-pass code review + arbiter classification
   iterator/      one-shot: apply review feedback via LLM + Serena
+  feedback/      one-shot: post-PR review loop, collects external findings
   eval/          golden-set evaluation harness
   eval-runner/   model comparison eval runner (name@endpoint syntax)
   internal/      shared helpers (config/state loading, GitHub client)
@@ -807,7 +808,7 @@ per language with appropriate toolchains and LSP servers:
 - `rust/Dockerfile` — extends base with Rust toolchain + rust-analyzer
 - `typescript/Dockerfile` — extends base with Node.js + typescript-language-server
 
-CI builds and pushes these as `quay.io/ruben/factory-{base,go,rust,typescript}`.
+CI builds and pushes these as `ghcr.io/ruromero/factory-{base,go,rust,typescript}`.
 
 ### Kubernetes
 
