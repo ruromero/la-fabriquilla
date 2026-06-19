@@ -145,9 +145,9 @@ The planner receives `README.md`, `ARCHITECTURE.md`, and `CONVENTIONS.md` as con
 | `fabriquilla:blocked` | Sub-issue waiting on dependency |
 | `fabriquilla:requirements` | Repo missing required files (ARCHITECTURE.md, etc.) |
 
-## k8s deployment
+## Deployment
 
-In Kubernetes, credentials are injected via Secrets — never baked into images or ConfigMaps:
+Credentials are injected via environment or mounted files — never baked into images:
 
 ```yaml
 # Secret with the PEM and API keys
@@ -155,12 +155,10 @@ kubectl create secret generic fabriquilla-creds \
   --from-file=github-app.pem=/path/to/key.pem \
   --from-literal=GEMINI_API_KEY=your-key \
   --from-literal=DEEPSEEK_API_KEY=your-key
-
-# Mount PEM as a volume, Gemini key as env var
-# See Dockerfile for the scratch-based image
 ```
 
-The config file goes in a ConfigMap. Credentials stay in the Secret, mounted at `/etc/fabriquilla/`.
+Sandbox images are built from `deploy/sandbox-images/` (base + language-specific).
+See ARCHITECTURE.md §5 for the image layout.
 
 ## Design
 
