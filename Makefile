@@ -21,7 +21,7 @@ fmt:
 
 check: fmt vet test
 
-REGISTRY ?= quay.io/ruromero
+REGISTRY ?= ghcr.io/ruromero
 
 .PHONY: sandbox-base sandbox-go sandbox-rust sandbox-typescript sandbox-images
 
