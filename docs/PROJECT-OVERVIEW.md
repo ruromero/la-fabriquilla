@@ -798,18 +798,15 @@ Host machine
 
 ### Container Images
 
-**Main image** (Dockerfile): Multi-stage Go build → scratch base with all
-binaries. Entrypoint is the dispatcher.
+Sandbox images live in `deploy/sandbox-images/` — a common base extended
+per language with appropriate toolchains and LSP servers:
 
-**Serena image** (Dockerfile.serena): Python 3.13 + Go toolchain + Serena +
-LSP servers. Used inside sandboxes for code analysis.
+- `base/Dockerfile` — multi-stage Go build, all phase binaries, git, Serena
+- `go/Dockerfile` — extends base with Go toolchain + gopls
+- `rust/Dockerfile` — extends base with Rust toolchain + rust-analyzer
+- `typescript/Dockerfile` — extends base with Node.js + typescript-language-server
 
-**Sandbox images** (deploy/sandbox-images/): Language-specific extensions
-of a common base with appropriate toolchains and LSP servers:
-- `base/` - git, Serena, all phase binaries
-- `go/` - Go toolchain + gopls
-- `rust/` - Rust toolchain + rust-analyzer
-- `typescript/` - Node.js + typescript-language-server
+CI builds and pushes these as `quay.io/ruben/factory-{base,go,rust,typescript}`.
 
 ### Kubernetes
 

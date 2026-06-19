@@ -3,11 +3,6 @@ name: Sandbox Images
 on:
   push:
     branches: [main]
-    paths:
-      - 'cmd/**'
-      - 'deploy/sandbox-images/**'
-      - '*.go'
-      - 'go.mod'
   release:
     types: [published]
 
