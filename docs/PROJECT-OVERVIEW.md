@@ -807,7 +807,7 @@ per language with appropriate toolchains and LSP servers:
 - `rust/Dockerfile` — extends base with Rust toolchain + rust-analyzer
 - `typescript/Dockerfile` — extends base with Node.js + typescript-language-server
 
-CI builds and pushes these as `quay.io/ruben/factory-{base,go,rust,typescript}`.
+CI builds and pushes these as `ghcr.io/ruromero/factory-{base,go,rust,typescript}`.
 
 ### Kubernetes
 
