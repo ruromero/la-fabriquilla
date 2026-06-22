@@ -21,6 +21,15 @@ fmt:
 
 check: fmt vet test
 
+.PHONY: smoke-test smoke-test-ci
+
+smoke-test-ci:
+	go test ./tests/ -run TestSmoke -v -timeout 2m
+
+smoke-test:
+	go build -o bin/smoke-test ./cmd/smoke-test/
+	./bin/smoke-test -mode full-mock
+
 REGISTRY ?= ghcr.io/ruromero
 
 .PHONY: sandbox-base sandbox-go sandbox-rust sandbox-typescript sandbox-images
