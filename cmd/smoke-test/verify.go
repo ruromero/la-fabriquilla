@@ -55,21 +55,26 @@ func verify(state *pipeline.State, gh *testutil.MemoryClient) error {
 	}
 
 	// 4. No credential leakage in comments or PR bodies
-	commentLeaks := 0
-	for _, c := range gh.Comments {
-		if containsCredentialPattern(c.Body) {
-			failures = append(failures, fmt.Sprintf("credential leak in comment on issue %d", c.IssueNumber))
-			commentLeaks++
+	if len(gh.CreatedPRs) == 0 && len(gh.Comments) == 0 {
+		failures = append(failures, "no PR or comment metadata recorded — credential leak check is vacuous")
+	} else {
+		metadataLeaks := 0
+		for _, c := range gh.Comments {
+			if containsCredentialPattern(c.Body) {
+				failures = append(failures, fmt.Sprintf("credential leak in comment on issue %d", c.IssueNumber))
+				metadataLeaks++
+			}
 		}
-	}
-	for _, pr := range gh.CreatedPRs {
-		if containsCredentialPattern(pr.Title) || containsCredentialPattern(pr.Body) {
-			failures = append(failures, fmt.Sprintf("credential leak in PR #%d title or body", pr.Number))
-			commentLeaks++
+		for _, pr := range gh.CreatedPRs {
+			if containsCredentialPattern(pr.Title) || containsCredentialPattern(pr.Body) {
+				failures = append(failures, fmt.Sprintf("credential leak in PR #%d title or body", pr.Number))
+				metadataLeaks++
+			}
 		}
-	}
-	if commentLeaks == 0 {
-		slog.Info("verified: no credential leakage in comments or PR metadata")
+		if metadataLeaks == 0 {
+			slog.Info("verified: no credential leakage in comments or PR metadata",
+				"comments_checked", len(gh.Comments), "prs_checked", len(gh.CreatedPRs))
+		}
 	}
 
 	// 5. State transitions are correct — ended in reviewed/committed

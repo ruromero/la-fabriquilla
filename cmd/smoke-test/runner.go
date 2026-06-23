@@ -64,6 +64,18 @@ func runFullMock(ctx context.Context) error {
 		return fmt.Errorf("load final state: %w", err)
 	}
 
+	// Simulate the dispatcher's GitHub interactions after the pipeline completes,
+	// so the verifier has recorded metadata to scan for credential leakage.
+	if state.PRNumber != 0 {
+		prBody := fmt.Sprintf("Automated PR for issue #%d\n\nFiles changed: %d", state.IssueNumber, len(state.Files))
+		if _, err := gh.CreatePullRequest(ctx, state.IssueTitle, prBody, state.PRBranch, "main"); err != nil {
+			return fmt.Errorf("simulate PR creation: %w", err)
+		}
+		if err := gh.CreateComment(ctx, state.IssueNumber, fmt.Sprintf("PR #%d created for this issue.", state.PRNumber)); err != nil {
+			return fmt.Errorf("simulate comment: %w", err)
+		}
+	}
+
 	return verify(state, gh)
 }
 
