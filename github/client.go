@@ -373,6 +373,21 @@ func (c *Client) CreatePullRequest(ctx context.Context, title, body, head, base 
 	return pr, nil
 }
 
+func (c *Client) ClosePullRequest(ctx context.Context, prNumber int) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d", c.owner, c.repo, prNumber)
+	return c.patch(ctx, url, map[string]string{"state": "closed"}, nil)
+}
+
+func (c *Client) DeleteBranch(ctx context.Context, branch string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/heads/%s", c.owner, c.repo, branch)
+	return c.delete(ctx, url)
+}
+
+func (c *Client) CloseIssue(ctx context.Context, issueNumber int) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d", c.owner, c.repo, issueNumber)
+	return c.patch(ctx, url, map[string]string{"state": "closed"}, nil)
+}
+
 func (c *Client) get(ctx context.Context, url string, result any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
