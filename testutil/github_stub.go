@@ -16,7 +16,7 @@ type MemoryClient struct {
 	issues map[int]*github.Issue
 	// Track operations for assertions
 	Comments   []RecordedComment
-	CreatedPRs []github.PullRequest
+	CreatedPRs []RecordedPR
 	nextPR     int
 	files      map[string]string
 }
@@ -24,6 +24,14 @@ type MemoryClient struct {
 type RecordedComment struct {
 	IssueNumber int
 	Body        string
+}
+
+type RecordedPR struct {
+	github.PullRequest
+	Title string
+	Body  string
+	Head  string
+	Base  string
 }
 
 type MemoryOption func(*MemoryClient)
@@ -95,7 +103,7 @@ func (mc *MemoryClient) RemoveLabel(_ context.Context, issueNumber int, label st
 	if !ok {
 		return fmt.Errorf("issue %d not found", issueNumber)
 	}
-	labels := issue.Labels[:0]
+	var labels []github.Label
 	for _, l := range issue.Labels {
 		if l.Name != label {
 			labels = append(labels, l)
@@ -174,7 +182,13 @@ func (mc *MemoryClient) CreatePullRequest(_ context.Context, title, body, head, 
 		HTMLURL: fmt.Sprintf("https://github.com/%s/%s/pull/%d", mc.owner, mc.repo, mc.nextPR),
 	}
 	mc.nextPR++
-	mc.CreatedPRs = append(mc.CreatedPRs, pr)
+	mc.CreatedPRs = append(mc.CreatedPRs, RecordedPR{
+		PullRequest: pr,
+		Title:       title,
+		Body:        body,
+		Head:        head,
+		Base:        base,
+	})
 	return pr, nil
 }
 

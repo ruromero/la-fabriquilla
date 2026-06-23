@@ -49,6 +49,23 @@
 - Review phase must use a different model family than code generation
 - CODEOWNERS, CONVENTIONS.md, CLAUDE.md are human-owned — never agent-modifiable
 
+## Slice & map safety
+
+- Never filter a slice in-place with `s[:0]` — this reuses the backing
+  array and a subsequent append can silently overwrite elements past the
+  new length. Always allocate a fresh `var result []T`.
+- When checking "expected set vs actual set," use a separate `seen` map
+  instead of `delete`-ing from the expected map. Mutating the map you
+  are iterating against hides mismatches and makes the success condition
+  depend on deletion order.
+
+## Test doubles
+
+- When a stub records operations for assertions (created PRs, posted
+  comments), the recorded struct must capture all caller-supplied
+  arguments — not just the return value fields. A field the caller
+  passes (e.g. PR body) but the stub discards cannot be verified later.
+
 ## Testing
 
 - Unit tests for all packages with non-trivial logic
