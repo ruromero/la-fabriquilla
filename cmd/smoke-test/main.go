@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	mode := flag.String("mode", "full-mock", "execution mode: full, mock-github, full-mock")
+	mode := flag.String("mode", "full-mock", "execution mode: full, full-mock")
 	timeout := flag.Duration("timeout", 30*time.Minute, "maximum test duration")
 	configPath := flag.String("config", "config.json", "path to config file")
 	flag.Parse()
@@ -38,8 +38,6 @@ func main() {
 	switch *mode {
 	case "full-mock":
 		err = runFullMock(ctx)
-	case "mock-github":
-		err = runMockGitHub(ctx, *configPath)
 	case "full":
 		err = runFull(ctx, *configPath)
 	default:

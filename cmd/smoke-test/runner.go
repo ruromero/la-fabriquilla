@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/exec"
 	"time"
 
+	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
+	"github.com/ruromero/la-fabriquilla/config"
 	"github.com/ruromero/la-fabriquilla/github"
 	"github.com/ruromero/la-fabriquilla/pipeline"
 	"github.com/ruromero/la-fabriquilla/testutil"
@@ -79,10 +83,98 @@ func runFullMock(ctx context.Context) error {
 	return verify(state, gh)
 }
 
-func runMockGitHub(ctx context.Context, configPath string) error {
-	return fmt.Errorf("mock-github mode requires Ollama; not yet implemented")
+func runFull(ctx context.Context, cfgPath string) error {
+	cfgVal, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if len(cfgVal.Repos) == 0 {
+		return fmt.Errorf("no repos configured")
+	}
+
+	repo := cfgVal.Repos[0]
+	gh, err := helpers.NewGitHubClientForApp(cfgVal, "dispatcher", repo.Owner, repo.Repo)
+	if err != nil {
+		return fmt.Errorf("create github client: %w", err)
+	}
+
+	// Create a fresh issue for this run
+	timestamp := time.Now().Format(time.RFC3339)
+	issue, err := gh.CreateIssue(ctx,
+		fmt.Sprintf("[smoke] Add subtract function — %s", timestamp),
+		"Add a `subtract(a, b int) int` function to `main.go` and a corresponding test in `main_test.go`.",
+		[]string{"fabriquilla:ready"},
+	)
+	if err != nil {
+		return fmt.Errorf("create test issue: %w", err)
+	}
+	slog.Info("created test issue", "number", issue.Number)
+
+	stateDir, err := os.MkdirTemp("", "smoke-state-*")
+	if err != nil {
+		return fmt.Errorf("create state dir: %w", err)
+	}
+	defer os.RemoveAll(stateDir)
+
+	if cfgVal.StateDir == "" {
+		cfgVal.StateDir = stateDir
+	}
+
+	sandboxImage := ""
+	if repo.SandboxImage != "" {
+		sandboxImage = repo.SandboxImage
+	} else if repo.Language != "" {
+		sandboxImage = "factory-" + repo.Language + ":latest"
+	}
+
+	orch := &pipeline.Orchestrator{
+		GH:           gh,
+		Config:       &cfgVal,
+		Store:        pipeline.NewFileStateStore(cfgVal.StateDir),
+		RunPhase:     runPhaseSubprocess(cfgPath),
+		SandboxImage: sandboxImage,
+		ConfigPath:   cfgPath,
+	}
+
+	state, err := orch.ProcessIssue(ctx, issue)
+
+	result := "PASSED"
+	if err != nil {
+		result = fmt.Sprintf("FAILED: %v", err)
+	}
+
+	// Guard against nil state if ProcessIssue failed before creating state
+	if state == nil {
+		state = &pipeline.State{}
+	}
+
+	// Always attempt cleanup, even if processing failed
+	cleanupErr := cleanup(ctx, gh, state, issue.Number, result)
+
+	if err != nil {
+		return err
+	}
+	return cleanupErr
 }
 
-func runFull(ctx context.Context, configPath string) error {
-	return fmt.Errorf("full mode requires real GitHub test repo; not yet implemented")
+func runPhaseSubprocess(cfgPath string) pipeline.PhaseRunner {
+	return func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
+		timeout := cfg.PhaseDuration(binary)
+		phaseCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(phaseCtx, binary)
+		cmd.Env = append(os.Environ(),
+			"PIPELINE_STATE_PATH="+statePath,
+			"CONFIG_PATH="+cfgPath,
+		)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		slog.Info("running phase", "phase", binary)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%s: %w", binary, err)
+		}
+		return nil
+	}
 }
