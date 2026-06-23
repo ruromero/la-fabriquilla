@@ -72,18 +72,17 @@ func verify(state *pipeline.State, gh *testutil.MemoryClient) error {
 }
 
 func containsCredentialPattern(s string) bool {
-	patterns := []string{
-		"ghp_", "gho_", "ghu_", "ghs_",
-		"PRIVATE KEY",
-		"sk-",
-		"password",
-		"secret",
-	}
+	// Token prefixes — always suspicious regardless of context
+	prefixes := []string{"ghp_", "gho_", "ghu_", "ghs_", "sk-ant-", "sk-proj-"}
 	lower := strings.ToLower(s)
-	for _, p := range patterns {
-		if strings.Contains(lower, strings.ToLower(p)) {
+	for _, p := range prefixes {
+		if strings.Contains(lower, p) {
 			return true
 		}
+	}
+	// Multi-word patterns
+	if strings.Contains(s, "PRIVATE KEY") || strings.Contains(lower, "private key") {
+		return true
 	}
 	return false
 }

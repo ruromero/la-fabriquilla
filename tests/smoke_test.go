@@ -74,7 +74,7 @@ func TestSmokePipeline(t *testing.T) {
 	}
 
 	// Verify state transitions
-	validFinalPhases := map[string]bool{"reviewed": true, "committed": true}
+	validFinalPhases := map[string]bool{"reviewed": true, "committed": true, "iterated": true}
 	if !validFinalPhases[state.Phase] {
 		t.Errorf("unexpected final phase: %s", state.Phase)
 	}

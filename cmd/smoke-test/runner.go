@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/ruromero/la-fabriquilla/github"
@@ -74,18 +73,4 @@ func runMockGitHub(ctx context.Context, configPath string) error {
 
 func runFull(ctx context.Context, configPath string) error {
 	return fmt.Errorf("full mode requires real GitHub test repo; not yet implemented")
-}
-
-// tempStateDir returns a temporary directory path and a cleanup function.
-func tempStateDir() (string, func(), error) {
-	dir, err := os.MkdirTemp("", "smoke-state-*")
-	if err != nil {
-		return "", nil, err
-	}
-	return dir, func() { os.RemoveAll(dir) }, nil
-}
-
-// ensureDir ensures a nested path exists for state files.
-func ensureDir(path string) error {
-	return os.MkdirAll(filepath.Dir(path), 0700)
 }
