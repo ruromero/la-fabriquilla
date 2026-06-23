@@ -40,6 +40,17 @@ export DEEPSEEK_API_KEY=your-key
 ./bin/dispatcher -config config.json
 ```
 
+## Smoke Test
+
+End-to-end pipeline smoke test. Three modes:
+
+| Mode | Command | Requirements |
+|------|---------|--------------|
+| Full mock (CI) | `make smoke-test-ci` | None |
+| Full mock (binary) | `make smoke-test` | None |
+| Mock GitHub | `./bin/smoke-test -mode mock-github` | Ollama running |
+| Full | `./bin/smoke-test -mode full -config config.json` | Ollama + test repo |
+
 ## Authentication
 
 ### Three GitHub Apps (recommended)
