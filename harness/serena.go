@@ -17,7 +17,7 @@ type SerenaSession struct {
 	Cleanup  func()
 }
 
-func CloneAndStartSerena(ctx context.Context, gh *github.Client, cfg config.SerenaConfig) (*SerenaSession, error) {
+func CloneAndStartSerena(ctx context.Context, gh github.Service, cfg config.SerenaConfig) (*SerenaSession, error) {
 	if !cfg.Enabled() {
 		return nil, nil
 	}
