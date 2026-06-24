@@ -59,6 +59,8 @@ image-push: image
 	$(CONTAINER_ENGINE) push $(REGISTRY)/fabriquilla:latest
 
 deploy:
+	@kubectl get secret -n fabriquilla fabriquilla-creds >/dev/null 2>&1 || \
+		(echo "Error: Secret 'fabriquilla-creds' not found. Create it first — see deploy/k8s/secret.example.yaml" && exit 1)
 	kubectl apply -f deploy/k8s/namespace.yaml
 	kubectl apply -f deploy/k8s/configmap.yaml
 	kubectl apply -f deploy/k8s/pvc.yaml

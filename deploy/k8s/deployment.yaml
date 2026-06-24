@@ -17,6 +17,10 @@ spec:
       labels:
         app: fabriquilla
     spec:
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
       containers:
         - name: dispatcher
           image: ghcr.io/ruromero/fabriquilla:latest
@@ -34,12 +38,6 @@ spec:
                 secretKeyRef:
                   name: fabriquilla-creds
                   key: DEEPSEEK_API_KEY
-            - name: FABRIQUILLA_DISPATCHER_KEY_PATH
-              value: /etc/fabriquilla/keys/dispatcher.pem
-            - name: FABRIQUILLA_WORKER_KEY_PATH
-              value: /etc/fabriquilla/keys/worker.pem
-            - name: FABRIQUILLA_COMMITTER_KEY_PATH
-              value: /etc/fabriquilla/keys/committer.pem
           volumeMounts:
             - name: config
               mountPath: /etc/fabriquilla

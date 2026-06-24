@@ -15,6 +15,23 @@ data:
         "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key_env": "GEMINI_API_KEY"},
         "deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"}
       },
+      "apps": {
+        "dispatcher": {
+          "app_id": 0,
+          "installation_id": 0,
+          "private_key_path": "/etc/fabriquilla/keys/dispatcher.pem"
+        },
+        "worker": {
+          "app_id": 0,
+          "installation_id": 0,
+          "private_key_path": "/etc/fabriquilla/keys/worker.pem"
+        },
+        "committer": {
+          "app_id": 0,
+          "installation_id": 0,
+          "private_key_path": "/etc/fabriquilla/keys/committer.pem"
+        }
+      },
       "poll_interval": "30s",
       "max_iterations": 3,
       "max_cost_budget": 100000,
