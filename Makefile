@@ -21,7 +21,7 @@ fmt:
 
 check: fmt vet test
 
-.PHONY: smoke-test smoke-test-ci
+.PHONY: smoke-test smoke-test-ci smoke-test-full
 
 smoke-test-ci:
 	go test -race ./tests/ -run TestSmoke -v -timeout 2m
@@ -30,6 +30,11 @@ smoke-test:
 	@mkdir -p bin
 	go build -o bin/smoke-test ./cmd/smoke-test/
 	./bin/smoke-test -mode full-mock
+
+smoke-test-full: build
+	@mkdir -p bin
+	go build -o bin/smoke-test ./cmd/smoke-test/
+	PATH=$(PWD)/bin:$$PATH ./bin/smoke-test -mode full -config $(CONFIG)
 
 REGISTRY ?= ghcr.io/ruromero
 

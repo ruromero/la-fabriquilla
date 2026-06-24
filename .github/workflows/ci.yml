@@ -29,3 +29,18 @@ jobs:
 
       - name: Build
         run: CGO_ENABLED=0 go build ./...
+
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run smoke tests
+        run: make smoke-test-ci

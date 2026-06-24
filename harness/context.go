@@ -20,7 +20,7 @@ var contextDocs = []string{
 	"CONVENTIONS.md",
 }
 
-func LoadRepoContext(ctx context.Context, gh *github.Client) *RepoContext {
+func LoadRepoContext(ctx context.Context, gh github.Service) *RepoContext {
 	rc := &RepoContext{
 		docs:     make(map[string]string),
 		sections: make(map[string][]Section),

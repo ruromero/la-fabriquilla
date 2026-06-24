@@ -65,3 +65,31 @@ func TestMemoryClientCreatePR(t *testing.T) {
 		t.Error("expected 1 created PR in history")
 	}
 }
+
+func TestMemoryClientCleanup(t *testing.T) {
+	mc := NewMemoryClient("test-owner", "test-repo",
+		WithIssue(github.Issue{Number: 1, Title: "test", Labels: []github.Label{{Name: "fabriquilla:ready"}}}),
+	)
+	ctx := context.Background()
+
+	// Create a PR first
+	pr, err := mc.CreatePullRequest(ctx, "title", "body", "feat-branch", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Close PR
+	if err := mc.ClosePullRequest(ctx, pr.Number); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete branch
+	if err := mc.DeleteBranch(ctx, "feat-branch"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Close issue
+	if err := mc.CloseIssue(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+}
