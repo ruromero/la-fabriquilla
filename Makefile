@@ -31,10 +31,10 @@ smoke-test:
 	go build -o bin/smoke-test ./cmd/smoke-test/
 	./bin/smoke-test -mode full-mock
 
-smoke-test-full:
+smoke-test-full: build
 	@mkdir -p bin
 	go build -o bin/smoke-test ./cmd/smoke-test/
-	./bin/smoke-test -mode full -config $(CONFIG)
+	PATH=$(PWD)/bin:$$PATH ./bin/smoke-test -mode full -config $(CONFIG)
 
 REGISTRY ?= ghcr.io/ruromero
 

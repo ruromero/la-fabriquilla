@@ -64,21 +64,21 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 	}
 
 	if err := o.Store.Save(ctx, key, state); err != nil {
-		return nil, fmt.Errorf("save initial state: %w", err)
+		return state, fmt.Errorf("save initial state: %w", err)
 	}
 
 	statePath := o.Store.StatePath(key)
 
 	log.Info("starting gather phase")
 	if err := o.RunPhase(ctx, o.Config, "gatherer", statePath, issue.Number, o.SandboxImage); err != nil {
-		return nil, fmt.Errorf("gather phase: %w", err)
+		return o.bestState(ctx, key, state), fmt.Errorf("gather phase: %w", err)
 	}
 	state, err = o.Store.Load(ctx, key)
 	if err != nil {
-		return nil, fmt.Errorf("reload state after gather: %w", err)
+		return state, fmt.Errorf("reload state after gather: %w", err)
 	}
 	if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
-		return nil, fmt.Errorf("budget exceeded after gather: %w", err)
+		return state, fmt.Errorf("budget exceeded after gather: %w", err)
 	}
 
 	log.Info("starting research phase")
@@ -87,24 +87,24 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 	} else {
 		state, err = o.Store.Load(ctx, key)
 		if err != nil {
-			return nil, fmt.Errorf("reload state after research: %w", err)
+			return state, fmt.Errorf("reload state after research: %w", err)
 		}
 		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
-			return nil, fmt.Errorf("budget exceeded after research: %w", err)
+			return state, fmt.Errorf("budget exceeded after research: %w", err)
 		}
 	}
 
 	log.Info("starting plan phase")
 	if err := o.RunPhase(ctx, o.Config, "planner", statePath, issue.Number, o.SandboxImage); err != nil {
-		return nil, fmt.Errorf("plan phase: %w", err)
+		return o.bestState(ctx, key, state), fmt.Errorf("plan phase: %w", err)
 	}
 
 	state, err = o.Store.Load(ctx, key)
 	if err != nil {
-		return nil, fmt.Errorf("reload state after plan: %w", err)
+		return state, fmt.Errorf("reload state after plan: %w", err)
 	}
 	if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
-		return nil, fmt.Errorf("budget exceeded after plan: %w", err)
+		return state, fmt.Errorf("budget exceeded after plan: %w", err)
 	}
 
 	switch state.PlanOutcome {
@@ -112,7 +112,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 		log.Info("planner needs more info")
 		comment := fmt.Sprintf("## Factory: Additional Information Needed\n\n%s", state.PlanContent)
 		if err := o.GH.CreateComment(ctx, issue.Number, comment); err != nil {
-			return nil, fmt.Errorf("post needs-info comment: %w", err)
+			return state, fmt.Errorf("post needs-info comment: %w", err)
 		}
 		o.GH.RemoveLabel(ctx, issue.Number, "fabriquilla:in-progress")
 		return state, o.GH.AddLabel(ctx, issue.Number, "fabriquilla:needs-info")
@@ -121,10 +121,10 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 		log.Info("planner decomposing issue")
 		comment := fmt.Sprintf("## Factory: Issue Decomposed\n\nThis issue is too complex for a single PR. Creating sub-issues.\n\n%s", state.PlanContent)
 		if err := o.GH.CreateComment(ctx, issue.Number, comment); err != nil {
-			return nil, fmt.Errorf("post decompose comment: %w", err)
+			return state, fmt.Errorf("post decompose comment: %w", err)
 		}
 		if err := CreateSubIssues(ctx, o.GH, issue.Number, state.PlanContent); err != nil {
-			return nil, fmt.Errorf("create sub-issues: %w", err)
+			return state, fmt.Errorf("create sub-issues: %w", err)
 		}
 		o.GH.RemoveLabel(ctx, issue.Number, "fabriquilla:in-progress")
 		return state, o.GH.AddLabel(ctx, issue.Number, "fabriquilla:tracking")
@@ -136,50 +136,50 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 			comment += fmt.Sprintf("\n\n<details><summary>Research Context</summary>\n\n%s\n\n</details>", state.ResearchContext)
 		}
 		if err := o.GH.CreateComment(ctx, issue.Number, comment); err != nil {
-			return nil, fmt.Errorf("post plan comment: %w", err)
+			return state, fmt.Errorf("post plan comment: %w", err)
 		}
 
 		log.Info("starting design phase")
 		if err := o.RunPhase(ctx, o.Config, "designer", statePath, issue.Number, o.SandboxImage); err != nil {
-			return nil, fmt.Errorf("design phase: %w", err)
+			return o.bestState(ctx, key, state), fmt.Errorf("design phase: %w", err)
 		}
 		state, err = o.Store.Load(ctx, key)
 		if err != nil {
-			return nil, fmt.Errorf("reload state after design: %w", err)
+			return state, fmt.Errorf("reload state after design: %w", err)
 		}
 		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
-			return nil, fmt.Errorf("budget exceeded after design: %w", err)
+			return state, fmt.Errorf("budget exceeded after design: %w", err)
 		}
 
 		log.Info("starting code phase (includes review+iterate)")
 		if err := o.RunPhase(ctx, o.Config, "coder", statePath, issue.Number, o.SandboxImage); err != nil {
-			return nil, fmt.Errorf("code phase: %w", err)
+			return o.bestState(ctx, key, state), fmt.Errorf("code phase: %w", err)
 		}
 		state, err = o.Store.Load(ctx, key)
 		if err != nil {
-			return nil, fmt.Errorf("reload state after code: %w", err)
+			return state, fmt.Errorf("reload state after code: %w", err)
 		}
 		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
-			return nil, fmt.Errorf("budget exceeded after code: %w", err)
+			return state, fmt.Errorf("scope/budget exceeded after code: %w", err)
 		}
 		if err := CheckPRScope(state.Files, o.Config.MaxFilesChanged, o.Config.MaxPRSizeLines); err != nil {
-			return nil, fmt.Errorf("scope check: %w", err)
+			return state, fmt.Errorf("scope check: %w", err)
 		}
 		if err := ValidateFiles(state.Files, o.Config.BlockedPaths); err != nil {
-			return nil, fmt.Errorf("path validation: %w", err)
+			return state, fmt.Errorf("path validation: %w", err)
 		}
 		if violations := ValidateContents(state.Files); len(violations) > 0 {
-			return nil, fmt.Errorf("secret detected in generated code: %s in %s line %d", violations[0].Pattern, violations[0].File, violations[0].Line)
+			return state, fmt.Errorf("secret detected in generated code: %s in %s line %d", violations[0].Pattern, violations[0].File, violations[0].Line)
 		}
 
 		log.Info("starting commit phase")
 		if err := o.RunPhase(ctx, o.Config, "committer", statePath, issue.Number, o.SandboxImage); err != nil {
-			return nil, fmt.Errorf("commit phase: %w", err)
+			return o.bestState(ctx, key, state), fmt.Errorf("commit phase: %w", err)
 		}
 
 		state, err = o.Store.Load(ctx, key)
 		if err != nil {
-			return nil, fmt.Errorf("reload state after commit: %w", err)
+			return state, fmt.Errorf("reload state after commit: %w", err)
 		}
 
 		if state.PRNumber > 0 {
@@ -193,7 +193,17 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 		return state, nil
 	}
 
-	return nil, fmt.Errorf("unknown plan outcome: %s", state.PlanOutcome)
+	return state, fmt.Errorf("unknown plan outcome: %s", state.PlanOutcome)
+}
+
+// bestState attempts to reload state from the store after a phase failure,
+// returning the freshest version that may contain PR metadata written by
+// the failed phase. Falls back to the provided state if reload fails.
+func (o *Orchestrator) bestState(ctx context.Context, key string, fallback *State) *State {
+	if loaded, err := o.Store.Load(ctx, key); err == nil {
+		return loaded
+	}
+	return fallback
 }
 
 // reviewIterateLoop runs the reviewer/iterator loop up to Config.MaxIterations times.

@@ -116,9 +116,7 @@ func runFull(ctx context.Context, cfgPath string) error {
 	}
 	defer os.RemoveAll(stateDir)
 
-	if cfgVal.StateDir == "" {
-		cfgVal.StateDir = stateDir
-	}
+	cfgVal.StateDir = stateDir
 
 	sandboxImage := ""
 	if repo.SandboxImage != "" {
