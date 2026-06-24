@@ -36,7 +36,10 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 
 	key := StateKey(o.GH.Owner(), o.GH.Repo(), issue.Number)
 
-	rc := harness.LoadRepoContext(ctx, o.GH, o.AgentInstructionsFile)
+	rc, err := harness.LoadRepoContext(ctx, o.GH, o.AgentInstructionsFile)
+	if err != nil {
+		return nil, fmt.Errorf("load repo context: %w", err)
+	}
 
 	issueTitle := sandbox.SanitizeInput(issue.Title)
 	issueBody := sandbox.SanitizeInput(issue.Body)

@@ -155,12 +155,41 @@ func (mc *MemoryClient) GetFileContent(_ context.Context, path string) (string, 
 }
 
 func (mc *MemoryClient) CheckReadiness(_ context.Context) (github.ReadinessResult, error) {
-	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"} {
-		if _, ok := mc.files[name]; ok {
-			return github.ReadinessResult{Ready: true, AgentInstructionsFile: name}, nil
+	var missing []string
+
+	for _, name := range []string{"README.md", "ARCHITECTURE.md", "CONVENTIONS.md", ".serena"} {
+		if _, ok := mc.files[name]; !ok {
+			missing = append(missing, name)
 		}
 	}
-	return github.ReadinessResult{Ready: true, AgentInstructionsFile: ""}, nil
+
+	codeownersFound := false
+	for _, path := range []string{"CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"} {
+		if _, ok := mc.files[path]; ok {
+			codeownersFound = true
+			break
+		}
+	}
+	if !codeownersFound {
+		missing = append(missing, "CODEOWNERS")
+	}
+
+	agentFile := ""
+	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"} {
+		if _, ok := mc.files[name]; ok {
+			agentFile = name
+			break
+		}
+	}
+	if agentFile == "" {
+		missing = append(missing, "agent instructions file")
+	}
+
+	return github.ReadinessResult{
+		Ready:                 len(missing) == 0,
+		Missing:               missing,
+		AgentInstructionsFile: agentFile,
+	}, nil
 }
 
 func (mc *MemoryClient) CloneShallow(_ context.Context) (string, func(), error) {

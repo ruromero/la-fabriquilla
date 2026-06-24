@@ -40,7 +40,11 @@ func main() {
 		defer sess.Cleanup()
 	}
 
-	rc := harness.LoadRepoContext(ctx, gh, state.AgentInstructionsFile)
+	rc, err := harness.LoadRepoContext(ctx, gh, state.AgentInstructionsFile)
+	if err != nil {
+		slog.Error("failed to load repo context", "error", err)
+		os.Exit(1)
+	}
 
 	var serenaClient *mcp.Client
 	if sess != nil {

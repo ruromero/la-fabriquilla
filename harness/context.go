@@ -10,8 +10,9 @@ import (
 )
 
 type RepoContext struct {
-	docs     map[string]string
-	sections map[string][]Section
+	docs                  map[string]string
+	sections              map[string][]Section
+	agentInstructionsFile string
 }
 
 var contextDocs = []string{
@@ -20,18 +21,14 @@ var contextDocs = []string{
 	"CONVENTIONS.md",
 }
 
-func LoadRepoContext(ctx context.Context, gh github.Service, agentInstructionsFile string) *RepoContext {
+func LoadRepoContext(ctx context.Context, gh github.Service, agentInstructionsFile string) (*RepoContext, error) {
 	rc := &RepoContext{
-		docs:     make(map[string]string),
-		sections: make(map[string][]Section),
+		docs:                  make(map[string]string),
+		sections:              make(map[string][]Section),
+		agentInstructionsFile: agentInstructionsFile,
 	}
 
-	docs := contextDocs
-	if agentInstructionsFile != "" {
-		docs = append(docs, agentInstructionsFile)
-	}
-
-	for _, name := range docs {
+	for _, name := range contextDocs {
 		content, err := gh.GetFileContent(ctx, name)
 		if err != nil {
 			slog.Warn("could not load repo context file", "file", name, "error", err)
@@ -41,12 +38,30 @@ func LoadRepoContext(ctx context.Context, gh github.Service, agentInstructionsFi
 		rc.sections[name] = ParseSections(content)
 	}
 
-	return rc
+	if agentInstructionsFile != "" {
+		content, err := gh.GetFileContent(ctx, agentInstructionsFile)
+		if err != nil {
+			return nil, fmt.Errorf("load agent instructions %s: %w", agentInstructionsFile, err)
+		}
+		rc.docs[agentInstructionsFile] = content
+		rc.sections[agentInstructionsFile] = ParseSections(content)
+	}
+
+	return rc, nil
+}
+
+func (rc *RepoContext) allDocNames() []string {
+	names := make([]string, len(contextDocs))
+	copy(names, contextDocs)
+	if rc.agentInstructionsFile != "" {
+		names = append(names, rc.agentInstructionsFile)
+	}
+	return names
 }
 
 func (rc *RepoContext) Summaries() string {
 	var b strings.Builder
-	for _, name := range contextDocs {
+	for _, name := range rc.allDocNames() {
 		content, ok := rc.docs[name]
 		if !ok {
 			continue
@@ -63,7 +78,7 @@ func (rc *RepoContext) Conventions() string {
 
 func (rc *RepoContext) ListDocuments() []string {
 	var names []string
-	for _, name := range contextDocs {
+	for _, name := range rc.allDocNames() {
 		if _, ok := rc.docs[name]; ok {
 			names = append(names, name)
 		}

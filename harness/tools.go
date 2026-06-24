@@ -85,7 +85,7 @@ func ContextTools() []inference.Tool {
 			Type: "function",
 			Function: inference.ToolDef{
 				Name:        "list_documents",
-				Description: "List available project documentation files (README.md, ARCHITECTURE.md, CONVENTIONS.md)",
+				Description: "List available project documentation files loaded into context",
 				Parameters: map[string]any{
 					"type":       "object",
 					"properties": map[string]any{},

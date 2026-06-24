@@ -45,7 +45,11 @@ func main() {
 	coderTools, coderHandler := harness.BuildCoderTools(serenaClient)
 
 	gh := helpers.MustGitHubClientForApp(cfg, "worker", state)
-	rc := harness.LoadRepoContext(ctx, gh, state.AgentInstructionsFile)
+	rc, err := harness.LoadRepoContext(ctx, gh, state.AgentInstructionsFile)
+	if err != nil {
+		slog.Error("failed to load repo context", "error", err)
+		os.Exit(1)
+	}
 	gatherTools, gatherHandler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
