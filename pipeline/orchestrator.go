@@ -20,13 +20,13 @@ type PhaseRunner func(ctx context.Context, cfg *config.Config, binary, statePath
 // through the full pipeline. It is constructed by the dispatcher (or smoke
 // test) and called via ProcessIssue.
 type Orchestrator struct {
-	GH                    github.Service
-	Config                *config.Config
-	Store                 *FileStateStore
-	RunPhase              PhaseRunner
-	SandboxImage          string
-	ConfigPath            string
-	AgentInstructionsFile string
+	GH           github.Service
+	Config       *config.Config
+	Store        *FileStateStore
+	RunPhase     PhaseRunner
+	SandboxImage string
+	ConfigPath   string
+	IncludeDocs  []string
 }
 
 // ProcessIssue runs the full pipeline for a single GitHub issue and returns
@@ -36,10 +36,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 
 	key := StateKey(o.GH.Owner(), o.GH.Repo(), issue.Number)
 
-	rc, err := harness.LoadRepoContext(ctx, o.GH, o.AgentInstructionsFile)
-	if err != nil {
-		return nil, fmt.Errorf("load repo context: %w", err)
-	}
+	rc := harness.LoadRepoContext(ctx, o.GH, o.IncludeDocs)
 
 	issueTitle := sandbox.SanitizeInput(issue.Title)
 	issueBody := sandbox.SanitizeInput(issue.Body)
@@ -55,7 +52,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 		CommentHistory:        commentHistory,
 		Summaries:             rc.Summaries(),
 		Conventions:           rc.Conventions(),
-		AgentInstructionsFile: o.AgentInstructionsFile,
+		IncludeDocs:           o.IncludeDocs,
 		StartedAt:             time.Now(),
 	}
 

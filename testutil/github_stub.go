@@ -157,12 +157,6 @@ func (mc *MemoryClient) GetFileContent(_ context.Context, path string) (string, 
 func (mc *MemoryClient) CheckReadiness(_ context.Context) (github.ReadinessResult, error) {
 	var missing []string
 
-	for _, name := range []string{"README.md", "ARCHITECTURE.md", "CONVENTIONS.md", ".serena"} {
-		if _, ok := mc.files[name]; !ok {
-			missing = append(missing, name)
-		}
-	}
-
 	codeownersFound := false
 	for _, path := range []string{"CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"} {
 		if _, ok := mc.files[path]; ok {
@@ -174,21 +168,13 @@ func (mc *MemoryClient) CheckReadiness(_ context.Context) (github.ReadinessResul
 		missing = append(missing, "CODEOWNERS")
 	}
 
-	agentFile := ""
-	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"} {
-		if _, ok := mc.files[name]; ok {
-			agentFile = name
-			break
-		}
-	}
-	if agentFile == "" {
-		missing = append(missing, "agent instructions file")
+	if _, ok := mc.files[".serena"]; !ok {
+		missing = append(missing, ".serena")
 	}
 
 	return github.ReadinessResult{
-		Ready:                 len(missing) == 0,
-		Missing:               missing,
-		AgentInstructionsFile: agentFile,
+		Ready:   len(missing) == 0,
+		Missing: missing,
 	}, nil
 }
 

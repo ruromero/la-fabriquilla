@@ -670,18 +670,18 @@ fabriquilla:in-progress ──→ fabriquilla:done
 
 ### Repo Readiness
 
-Before processing any issue, the dispatcher checks for required files:
+Before processing any issue, the dispatcher checks for required structural files:
 
-- `README.md`
-- `ARCHITECTURE.md`
-- `CONVENTIONS.md`
 - `CODEOWNERS` (checked in root, `.github/`, and `docs/`)
-- Agent instructions file — at least one of: `CLAUDE.md`, `AGENTS.md`,
-  `GEMINI.md`, `.github/copilot-instructions.md`
 - `.serena/` directory
 
 Missing files cause: label swapped to `fabriquilla:requirements`, comment
 posted explaining what's missing, issue not processed.
+
+Context documents are loaded from the per-repo `include_docs` config (defaults
+to `README.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`). Missing docs are skipped;
+a warning is logged if none are found. Subpaths are supported
+(e.g. `docs/ARCHITECTURE.md`).
 
 ### PR Creation
 

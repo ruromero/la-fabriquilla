@@ -157,7 +157,7 @@ func pollAllRepos(ctx context.Context, cfg config.Config) {
 				log.Error("failed to remove label", "issue", issue.Number, "error", err)
 			}
 
-			if err := processIssue(ctx, gh, cfg, issue, readiness.AgentInstructionsFile); err != nil {
+			if err := processIssue(ctx, gh, cfg, repo, issue); err != nil {
 				log.Error("failed to process issue", "issue", issue.Number, "error", err)
 				gh.AddLabel(ctx, issue.Number, "fabriquilla:needs-human")
 			} else {
@@ -189,18 +189,18 @@ func repoSandboxImage(cfg config.Config, owner, repo string) string {
 	return ""
 }
 
-func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, issue github.Issue, agentInstructionsFile string) error {
+func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, repo config.RepoConfig, issue github.Issue) error {
 	store := pipeline.NewFileStateStore(cfg.StateDir)
 	sandboxImage := repoSandboxImage(cfg, gh.Owner(), gh.Repo())
 
 	orch := &pipeline.Orchestrator{
-		GH:                    gh,
-		Config:                &cfg,
-		Store:                 store,
-		RunPhase:              pipeline.PhaseRunner(runPhase),
-		SandboxImage:          sandboxImage,
-		ConfigPath:            configPath,
-		AgentInstructionsFile: agentInstructionsFile,
+		GH:           gh,
+		Config:       &cfg,
+		Store:        store,
+		RunPhase:     pipeline.PhaseRunner(runPhase),
+		SandboxImage: sandboxImage,
+		ConfigPath:   configPath,
+		IncludeDocs:  repo.EffectiveIncludeDocs(),
 	}
 
 	_, err := orch.ProcessIssue(ctx, issue)

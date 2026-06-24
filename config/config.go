@@ -122,15 +122,29 @@ type EvalConfig struct {
 	ResultsDir    string   `json:"results_dir"`
 }
 
+var DefaultIncludeDocs = []string{
+	"README.md",
+	"ARCHITECTURE.md",
+	"CONVENTIONS.md",
+}
+
 type RepoConfig struct {
-	Owner          string `json:"owner"`
-	Repo           string `json:"repo"`
-	Language       string `json:"language,omitempty"`
-	SandboxImage   string `json:"sandbox_image,omitempty"`
-	Token          string `json:"token,omitempty"`
-	AppID          int64  `json:"app_id,omitempty"`
-	PrivateKeyPath string `json:"private_key_path,omitempty"`
-	InstallationID int64  `json:"installation_id,omitempty"`
+	Owner          string   `json:"owner"`
+	Repo           string   `json:"repo"`
+	Language       string   `json:"language,omitempty"`
+	SandboxImage   string   `json:"sandbox_image,omitempty"`
+	IncludeDocs    []string `json:"include_docs,omitempty"`
+	Token          string   `json:"token,omitempty"`
+	AppID          int64    `json:"app_id,omitempty"`
+	PrivateKeyPath string   `json:"private_key_path,omitempty"`
+	InstallationID int64    `json:"installation_id,omitempty"`
+}
+
+func (r RepoConfig) EffectiveIncludeDocs() []string {
+	if len(r.IncludeDocs) > 0 {
+		return r.IncludeDocs
+	}
+	return DefaultIncludeDocs
 }
 
 func (r RepoConfig) UsesAppAuth() bool {

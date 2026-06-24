@@ -31,8 +31,8 @@ CGO_ENABLED=0 go build ./...
   to LLMs via prompts (zero framework cognition principle)
 - Application config is a JSON file, not env vars; credentials (API keys,
   PEM paths) are injected via env vars from k8s Secrets
-- Repo readiness accepts any agent instructions file (CLAUDE.md, AGENTS.md,
-  GEMINI.md, .github/copilot-instructions.md) — not tied to a specific LLM tool
+- Context documents are configurable per repo via `include_docs`; defaults
+  to README.md, ARCHITECTURE.md, CONVENTIONS.md
 - Inference uses OpenAI-compatible API (works with Ollama, DeepSeek, Gemini, etc.)
 - Models support function calling for MCP tool integration
 - Single GPU (RTX 3060 12GB) shared across all repos — only one

@@ -323,9 +323,9 @@ auto-dismiss to prevent deadlock. This deadlock prevention is shipped.
 1. Human creates GitHub issue, adds label "fabriquilla:ready"
 
 2. Dispatcher polls GitHub, finds issue
-   ├── Checks repo readiness (required files)
+   ├── Checks repo readiness (CODEOWNERS, .serena)
    ├── Swaps label: fabriquilla:ready → fabriquilla:in-progress
-   ├── Loads repo context (README, ARCHITECTURE, CONVENTIONS)
+   ├── Loads repo context (from include_docs config)
    ├── Sanitizes issue title/body
    ├── Loads human comment history
    ├── Initializes pipeline State, saves to disk
