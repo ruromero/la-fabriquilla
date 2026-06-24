@@ -42,14 +42,13 @@ export DEEPSEEK_API_KEY=your-key
 
 ## Smoke Test
 
-End-to-end pipeline smoke test. Three modes:
+End-to-end pipeline smoke test. Two modes:
 
 | Mode | Command | Requirements |
 |------|---------|--------------|
 | Full mock (CI) | `make smoke-test-ci` | None |
 | Full mock (binary) | `make smoke-test` | None |
-| Mock GitHub | `./bin/smoke-test -mode mock-github` | Ollama running |
-| Full | `./bin/smoke-test -mode full -config config.json` | Ollama + test repo |
+| Full | `./bin/smoke-test -mode full -config smoke-config.json` | Ollama + test repo + GitHub App |
 
 ## Authentication
 

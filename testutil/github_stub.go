@@ -205,6 +205,18 @@ func (mc *MemoryClient) ListPRReviews(_ context.Context, _ int) ([]github.PRRevi
 	return nil, nil
 }
 
+func (mc *MemoryClient) ClosePullRequest(_ context.Context, _ int) error {
+	return nil
+}
+
+func (mc *MemoryClient) DeleteBranch(_ context.Context, _ string) error {
+	return nil
+}
+
+func (mc *MemoryClient) CloseIssue(_ context.Context, _ int) error {
+	return nil
+}
+
 // Labels returns the current labels for an issue (for test assertions).
 func (mc *MemoryClient) Labels(issueNumber int) []string {
 	mc.mu.Lock()

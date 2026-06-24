@@ -39,6 +39,9 @@ config.json
 # Design specs (local-only)
 docs/superpowers/
 
+# Fixture repo scaffold (local reference only)
+docs/fixture-repo/
+
 # Eval results history (CI uploads as artifact)
 eval-results/
 

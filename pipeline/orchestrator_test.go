@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"context"
@@ -6,47 +6,68 @@ import (
 	"testing"
 
 	"github.com/ruromero/la-fabriquilla/config"
-	"github.com/ruromero/la-fabriquilla/pipeline"
 	"github.com/ruromero/la-fabriquilla/review"
 )
 
-func writeTestState(t *testing.T, dir string, state *pipeline.State) string {
+func TestOrchestratorType(t *testing.T) {
+	// Verify the type exists and has the expected fields
+	o := Orchestrator{}
+	_ = o.Config
+	_ = o.Store
+	_ = o.SandboxImage
+	_ = o.RunPhase
+}
+
+func writeTestState(t *testing.T, dir string, state *State) string {
 	t.Helper()
 	path := filepath.Join(dir, "state.json")
-	if err := pipeline.SaveState(path, state); err != nil {
+	if err := SaveState(path, state); err != nil {
 		t.Fatal(err)
 	}
 	return path
 }
 
+// makeOrch returns an Orchestrator wired up for the review-iterate loop tests.
+// The runner is injected via RunPhase; Store and Config are set up with the
+// temp dir and a permissive budget.
+func makeOrch(cfg *config.Config, store *FileStateStore, runner PhaseRunner, sandboxImage string) *Orchestrator {
+	return &Orchestrator{
+		Config:       cfg,
+		Store:        store,
+		RunPhase:     runner,
+		SandboxImage: sandboxImage,
+	}
+}
+
 func TestReviewIterateLoop_CleanReview(t *testing.T) {
 	dir := t.TempDir()
-	state := &pipeline.State{
+	state := &State{
 		IssueNumber: 1,
 		Code:        "package main",
 		Phase:       "commit-done",
 	}
 	statePath := writeTestState(t, dir, state)
 
-	store := pipeline.NewFileStateStore(dir)
+	store := NewFileStateStore(dir)
 	key := "state"
 
 	calls := 0
 	runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
 		calls++
-		s, _ := pipeline.LoadState(statePath)
+		s, _ := LoadState(statePath)
 		if binary == "reviewer" {
-			s.Review = &pipeline.ReviewState{
+			s.Review = &ReviewState{
 				Findings: []review.ReviewFinding{},
 			}
 			s.Phase = "review-done"
 		}
-		pipeline.SaveState(statePath, s)
+		SaveState(statePath, s)
 		return nil
 	}
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
-	err := reviewIterateLoop(context.Background(), cfg, store, key, statePath, "", 1, runner)
+	orch := makeOrch(cfg, store, runner, "")
+	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -57,24 +78,24 @@ func TestReviewIterateLoop_CleanReview(t *testing.T) {
 
 func TestReviewIterateLoop_MaxIterations(t *testing.T) {
 	dir := t.TempDir()
-	state := &pipeline.State{
+	state := &State{
 		IssueNumber: 1,
 		Code:        "package main",
 		Phase:       "commit-done",
 	}
 	statePath := writeTestState(t, dir, state)
 
-	store := pipeline.NewFileStateStore(dir)
+	store := NewFileStateStore(dir)
 	key := "state"
 
 	reviewerCalls := 0
 	iteratorCalls := 0
 	runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
-		s, _ := pipeline.LoadState(statePath)
+		s, _ := LoadState(statePath)
 		switch binary {
 		case "reviewer":
 			reviewerCalls++
-			s.Review = &pipeline.ReviewState{
+			s.Review = &ReviewState{
 				Findings: []review.ReviewFinding{
 					{Severity: review.SeverityCritical, Title: "Bug — something is wrong"},
 				},
@@ -84,12 +105,13 @@ func TestReviewIterateLoop_MaxIterations(t *testing.T) {
 			iteratorCalls++
 			s.Phase = "iterate-done"
 		}
-		pipeline.SaveState(statePath, s)
+		SaveState(statePath, s)
 		return nil
 	}
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
-	err := reviewIterateLoop(context.Background(), cfg, store, key, statePath, "", 1, runner)
+	orch := makeOrch(cfg, store, runner, "")
+	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,31 +125,31 @@ func TestReviewIterateLoop_MaxIterations(t *testing.T) {
 
 func TestReviewIterateLoop_ConvergesMidLoop(t *testing.T) {
 	dir := t.TempDir()
-	state := &pipeline.State{
+	state := &State{
 		IssueNumber: 1,
 		Code:        "package main",
 		Phase:       "commit-done",
 	}
 	statePath := writeTestState(t, dir, state)
 
-	store := pipeline.NewFileStateStore(dir)
+	store := NewFileStateStore(dir)
 	key := "state"
 
 	reviewerCalls := 0
 	iteratorCalls := 0
 	runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
-		s, _ := pipeline.LoadState(statePath)
+		s, _ := LoadState(statePath)
 		switch binary {
 		case "reviewer":
 			reviewerCalls++
 			if reviewerCalls == 1 {
-				s.Review = &pipeline.ReviewState{
+				s.Review = &ReviewState{
 					Findings: []review.ReviewFinding{
 						{Severity: review.SeverityCritical, Title: "Bug — something is wrong"},
 					},
 				}
 			} else {
-				s.Review = &pipeline.ReviewState{
+				s.Review = &ReviewState{
 					Findings: []review.ReviewFinding{},
 				}
 			}
@@ -136,12 +158,13 @@ func TestReviewIterateLoop_ConvergesMidLoop(t *testing.T) {
 			iteratorCalls++
 			s.Phase = "iterate-done"
 		}
-		pipeline.SaveState(statePath, s)
+		SaveState(statePath, s)
 		return nil
 	}
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
-	err := reviewIterateLoop(context.Background(), cfg, store, key, statePath, "", 1, runner)
+	orch := makeOrch(cfg, store, runner, "")
+	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -155,27 +178,27 @@ func TestReviewIterateLoop_ConvergesMidLoop(t *testing.T) {
 
 func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
 	dir := t.TempDir()
-	state := &pipeline.State{
+	state := &State{
 		IssueNumber: 1,
 		Code:        "package main",
 		Phase:       "commit-done",
 	}
 	statePath := writeTestState(t, dir, state)
 
-	store := pipeline.NewFileStateStore(dir)
+	store := NewFileStateStore(dir)
 	key := "state"
 
 	calls := 0
 	runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
 		calls++
-		s, _ := pipeline.LoadState(statePath)
+		s, _ := LoadState(statePath)
 		if binary == "reviewer" {
-			s.Review = &pipeline.ReviewState{
+			s.Review = &ReviewState{
 				Findings: []review.ReviewFinding{
 					{Severity: review.SeverityCritical, Title: "false positive"},
 				},
 			}
-			s.ArbiterResult = &pipeline.ArbiterState{
+			s.ArbiterResult = &ArbiterState{
 				Findings: []review.ArbiterFinding{
 					{
 						Finding:        review.ReviewFinding{Severity: review.SeverityCritical, Title: "false positive"},
@@ -186,7 +209,7 @@ func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
 			}
 			s.Phase = "review-done"
 		}
-		pipeline.SaveState(statePath, s)
+		SaveState(statePath, s)
 		return nil
 	}
 
@@ -198,7 +221,8 @@ func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
 			"deepseek": {BaseURL: "https://api.deepseek.com/v1"},
 		},
 	}
-	err := reviewIterateLoop(context.Background(), cfg, store, key, statePath, "", 1, runner)
+	orch := makeOrch(cfg, store, runner, "")
+	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -209,11 +233,11 @@ func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
 
 func TestReviewIterateLoop_StaleArbiterIgnoredWhenDisabled(t *testing.T) {
 	dir := t.TempDir()
-	state := &pipeline.State{
+	state := &State{
 		IssueNumber: 1,
 		Code:        "package main",
 		Phase:       "commit-done",
-		ArbiterResult: &pipeline.ArbiterState{
+		ArbiterResult: &ArbiterState{
 			Findings: []review.ArbiterFinding{
 				{
 					Finding:        review.ReviewFinding{Severity: review.SeverityCritical, Title: "stale finding"},
@@ -225,26 +249,27 @@ func TestReviewIterateLoop_StaleArbiterIgnoredWhenDisabled(t *testing.T) {
 	}
 	statePath := writeTestState(t, dir, state)
 
-	store := pipeline.NewFileStateStore(dir)
+	store := NewFileStateStore(dir)
 	key := "state"
 
 	calls := 0
 	runner := func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error {
 		calls++
-		s, _ := pipeline.LoadState(statePath)
+		s, _ := LoadState(statePath)
 		if binary == "reviewer" {
-			s.Review = &pipeline.ReviewState{
+			s.Review = &ReviewState{
 				Findings: []review.ReviewFinding{},
 			}
 			s.ArbiterResult = nil
 			s.Phase = "review-done"
 		}
-		pipeline.SaveState(statePath, s)
+		SaveState(statePath, s)
 		return nil
 	}
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
-	err := reviewIterateLoop(context.Background(), cfg, store, key, statePath, "", 1, runner)
+	orch := makeOrch(cfg, store, runner, "")
+	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

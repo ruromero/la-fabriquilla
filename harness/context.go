@@ -20,9 +20,7 @@ var contextDocs = []string{
 	"CONVENTIONS.md",
 }
 
-// LoadRepoContext loads standard repo documentation into context.
-// If agentInstructionsFile is non-empty, that file is also loaded.
-func LoadRepoContext(ctx context.Context, gh *github.Client, agentInstructionsFile string) *RepoContext {
+func LoadRepoContext(ctx context.Context, gh github.Service, agentInstructionsFile string) *RepoContext {
 	rc := &RepoContext{
 		docs:     make(map[string]string),
 		sections: make(map[string][]Section),

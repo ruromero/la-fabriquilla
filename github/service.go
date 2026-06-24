@@ -31,4 +31,9 @@ type Service interface {
 	// PR review
 	ListPRReviewComments(ctx context.Context, prNumber int) ([]Comment, error)
 	ListPRReviews(ctx context.Context, prNumber int) ([]PRReview, error)
+
+	// Cleanup
+	ClosePullRequest(ctx context.Context, prNumber int) error
+	DeleteBranch(ctx context.Context, branch string) error
+	CloseIssue(ctx context.Context, issueNumber int) error
 }
