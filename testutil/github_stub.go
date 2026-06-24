@@ -155,7 +155,12 @@ func (mc *MemoryClient) GetFileContent(_ context.Context, path string) (string, 
 }
 
 func (mc *MemoryClient) CheckReadiness(_ context.Context) (github.ReadinessResult, error) {
-	return github.ReadinessResult{Ready: true}, nil
+	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"} {
+		if _, ok := mc.files[name]; ok {
+			return github.ReadinessResult{Ready: true, AgentInstructionsFile: name}, nil
+		}
+	}
+	return github.ReadinessResult{Ready: true, AgentInstructionsFile: ""}, nil
 }
 
 func (mc *MemoryClient) CloneShallow(_ context.Context) (string, func(), error) {

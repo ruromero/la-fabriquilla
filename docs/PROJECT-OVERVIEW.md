@@ -565,14 +565,17 @@ Before committing, all file paths are validated:
 The committer refuses to modify these paths:
 
 ```
-.github/workflows/*    CI/CD pipelines
-CODEOWNERS             permission boundaries
-.pr_agent.toml         review tool config
-CONVENTIONS.md         agent instructions
-ARCHITECTURE.md        system design docs
-CLAUDE.md              agent context
-.serena/*              MCP configuration
-deploy/*               k8s manifests, sandbox configs
+.github/workflows/*                CI/CD pipelines
+.github/copilot-instructions.md    agent instructions
+CODEOWNERS                         permission boundaries
+.pr_agent.toml                     review tool config
+CONVENTIONS.md                     agent instructions
+ARCHITECTURE.md                    system design docs
+CLAUDE.md                          agent instructions
+AGENTS.md                          agent instructions
+GEMINI.md                          agent instructions
+.serena/*                          MCP configuration
+deploy/*                           k8s manifests, sandbox configs
 ```
 
 If any file matches, the issue gets labeled `fabriquilla:needs-human`.
@@ -673,7 +676,8 @@ Before processing any issue, the dispatcher checks for required files:
 - `ARCHITECTURE.md`
 - `CONVENTIONS.md`
 - `CODEOWNERS` (checked in root, `.github/`, and `docs/`)
-- `CLAUDE.md`
+- Agent instructions file — at least one of: `CLAUDE.md`, `AGENTS.md`,
+  `GEMINI.md`, `.github/copilot-instructions.md`
 - `.serena/` directory
 
 Missing files cause: label swapped to `fabriquilla:requirements`, comment

@@ -138,7 +138,7 @@ The factory will skip repos that don't meet minimum requirements:
 - `ARCHITECTURE.md` — module layout, data models, API surface, infrastructure dependencies
 - `CONVENTIONS.md` — coding standards, patterns, and best practices that all agents must follow
 - `CODEOWNERS` — protects security-critical paths from autonomous modification
-- `CLAUDE.md` — minimal context file with non-obvious constraints
+- Agent instructions file (at least one of `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`) — minimal context with non-obvious constraints
 - `.serena/` — Serena MCP project config for LSP-powered code navigation
 
 The planner receives `README.md`, `ARCHITECTURE.md`, and `CONVENTIONS.md` as context to produce plans that fit the actual system. These docs can link to subdocuments for deeper detail.

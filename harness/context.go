@@ -20,13 +20,20 @@ var contextDocs = []string{
 	"CONVENTIONS.md",
 }
 
-func LoadRepoContext(ctx context.Context, gh *github.Client) *RepoContext {
+// LoadRepoContext loads standard repo documentation into context.
+// If agentInstructionsFile is non-empty, that file is also loaded.
+func LoadRepoContext(ctx context.Context, gh *github.Client, agentInstructionsFile string) *RepoContext {
 	rc := &RepoContext{
 		docs:     make(map[string]string),
 		sections: make(map[string][]Section),
 	}
 
-	for _, name := range contextDocs {
+	docs := contextDocs
+	if agentInstructionsFile != "" {
+		docs = append(docs, agentInstructionsFile)
+	}
+
+	for _, name := range docs {
 		content, err := gh.GetFileContent(ctx, name)
 		if err != nil {
 			slog.Warn("could not load repo context file", "file", name, "error", err)

@@ -26,7 +26,7 @@ func runFullMock(ctx context.Context) error {
 			Labels: []github.Label{{Name: "fabriquilla:ready"}},
 		}),
 		testutil.WithFile("CODEOWNERS", "* @smoke-owner"),
-		testutil.WithFile("CLAUDE.md", "# Test repo"),
+		testutil.WithFile("AGENTS.md", "# Test repo"),
 		testutil.WithFile("CONVENTIONS.md", "# Conventions"),
 		testutil.WithFile("ARCHITECTURE.md", "# Architecture"),
 		testutil.WithFile("README.md", "# Test"),

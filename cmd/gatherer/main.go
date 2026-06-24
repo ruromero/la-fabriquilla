@@ -40,7 +40,7 @@ func main() {
 		defer sess.Cleanup()
 	}
 
-	rc := harness.LoadRepoContext(ctx, gh)
+	rc := harness.LoadRepoContext(ctx, gh, state.AgentInstructionsFile)
 
 	var serenaClient *mcp.Client
 	if sess != nil {

@@ -426,14 +426,17 @@ No guardrail depends on LLM judgment.
 The committer refuses to commit changes to these paths:
 
 ```
-.github/workflows/*     CI/CD pipelines
-CODEOWNERS               permission boundaries
-.pr_agent.toml           review tool configuration
-CONVENTIONS.md           agent instructions
-ARCHITECTURE.md          system design docs
-CLAUDE.md                agent context
-.serena/*                MCP configuration
-deploy/*                 k8s manifests and sandbox configs
+.github/workflows/*                CI/CD pipelines
+.github/copilot-instructions.md    agent instructions
+CODEOWNERS                         permission boundaries
+.pr_agent.toml                     review tool configuration
+CONVENTIONS.md                     agent instructions
+ARCHITECTURE.md                    system design docs
+CLAUDE.md                          agent instructions
+AGENTS.md                          agent instructions
+GEMINI.md                          agent instructions
+.serena/*                          MCP configuration
+deploy/*                           k8s manifests and sandbox configs
 ```
 
 Enforced by `pipeline.ValidateFiles()`. If any file matches a blocked

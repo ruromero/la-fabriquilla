@@ -159,7 +159,7 @@ func pollAllRepos(ctx context.Context, cfg config.Config) {
 				log.Error("failed to remove label", "issue", issue.Number, "error", err)
 			}
 
-			if err := processIssue(ctx, gh, cfg, issue); err != nil {
+			if err := processIssue(ctx, gh, cfg, issue, readiness.AgentInstructionsFile); err != nil {
 				log.Error("failed to process issue", "issue", issue.Number, "error", err)
 				gh.AddLabel(ctx, issue.Number, "fabriquilla:needs-human")
 			} else {
@@ -191,30 +191,31 @@ func repoSandboxImage(cfg config.Config, owner, repo string) string {
 	return ""
 }
 
-func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, issue github.Issue) error {
+func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, issue github.Issue, agentInstructionsFile string) error {
 	log := slog.With("issue", issue.Number)
 	sandboxImage := repoSandboxImage(cfg, gh.Owner(), gh.Repo())
 
 	store := pipeline.NewFileStateStore(cfg.StateDir)
 	key := pipeline.StateKey(gh.Owner(), gh.Repo(), issue.Number)
 
-	rc := harness.LoadRepoContext(ctx, gh)
+	rc := harness.LoadRepoContext(ctx, gh, agentInstructionsFile)
 
 	issueTitle := sandbox.SanitizeInput(issue.Title)
 	issueBody := sandbox.SanitizeInput(issue.Body)
 	commentHistory := loadHumanComments(ctx, gh, issue.Number)
 
 	state := &pipeline.State{
-		RepoOwner:      gh.Owner(),
-		RepoName:       gh.Repo(),
-		IssueNumber:    issue.Number,
-		Phase:          "init",
-		IssueTitle:     issueTitle,
-		IssueBody:      issueBody,
-		CommentHistory: commentHistory,
-		Summaries:      rc.Summaries(),
-		Conventions:    rc.Conventions(),
-		StartedAt:      time.Now(),
+		RepoOwner:             gh.Owner(),
+		RepoName:              gh.Repo(),
+		IssueNumber:           issue.Number,
+		Phase:                 "init",
+		IssueTitle:            issueTitle,
+		IssueBody:             issueBody,
+		CommentHistory:        commentHistory,
+		Summaries:             rc.Summaries(),
+		Conventions:           rc.Conventions(),
+		AgentInstructionsFile: agentInstructionsFile,
+		StartedAt:             time.Now(),
 	}
 
 	sess, err := harness.CloneAndStartSerena(ctx, gh, cfg.Serena)

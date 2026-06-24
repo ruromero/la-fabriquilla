@@ -8,16 +8,23 @@ import (
 
 var requiredFiles = []string{
 	"CODEOWNERS",
-	"CLAUDE.md",
 	"CONVENTIONS.md",
 	"ARCHITECTURE.md",
 	"README.md",
 	".serena",
 }
 
+var agentInstructionFiles = []string{
+	"CLAUDE.md",
+	"AGENTS.md",
+	"GEMINI.md",
+	".github/copilot-instructions.md",
+}
+
 type ReadinessResult struct {
-	Ready   bool
-	Missing []string
+	Ready                 bool
+	Missing               []string
+	AgentInstructionsFile string
 }
 
 // CheckReadiness verifies the repo has the minimum required files
@@ -54,8 +61,25 @@ func (c *Client) CheckReadiness(ctx context.Context) (ReadinessResult, error) {
 		}
 	}
 
+	// Any recognized agent instructions file satisfies the requirement
+	agentFile := ""
+	for _, file := range agentInstructionFiles {
+		exists, err := c.FileExists(ctx, file)
+		if err != nil {
+			return ReadinessResult{}, fmt.Errorf("check %s: %w", file, err)
+		}
+		if exists {
+			agentFile = file
+			break
+		}
+	}
+	if agentFile == "" {
+		missing = append(missing, "agent instructions file (CLAUDE.md, AGENTS.md, GEMINI.md, or .github/copilot-instructions.md)")
+	}
+
 	return ReadinessResult{
-		Ready:   len(missing) == 0,
-		Missing: missing,
+		Ready:                 len(missing) == 0,
+		Missing:               missing,
+		AgentInstructionsFile: agentFile,
 	}, nil
 }

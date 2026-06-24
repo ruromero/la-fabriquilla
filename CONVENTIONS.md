@@ -22,7 +22,8 @@
 - No LLM frameworks — direct HTTP calls to Ollama and Gemini APIs
 - All judgment deferred to LLMs via prompts, no judgment in Go code
 - Agent prompts are string constants in their respective files
-- Config is JSON file, not env vars
+- Application config is a JSON file, not env vars; credentials (API keys,
+  PEM paths) are injected via env vars from k8s Secrets — never in config files
 - All untrusted input must pass through `sandbox.SanitizeInput`
 
 ## Config
@@ -47,7 +48,9 @@
 - Credentials never appear in prompts, logs, or agent context
 - No agent output may modify agent configuration or prompts
 - Review phase must use a different model family than code generation
-- CODEOWNERS, CONVENTIONS.md, CLAUDE.md are human-owned — never agent-modifiable
+- CODEOWNERS, CONVENTIONS.md, and agent instructions files (CLAUDE.md,
+  AGENTS.md, GEMINI.md, .github/copilot-instructions.md) are human-owned
+  — never agent-modifiable
 
 ## Slice & map safety
 
