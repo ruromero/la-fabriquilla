@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fabriquilla-config
+  namespace: fabriquilla
+data:
+  config.json: |
+    {
+      "default_model": "qwen3:14b@ollama",
+      "planner": {"model": "gemini-2.5-flash@gemini"},
+      "researcher": {"model": "gemini-2.5-flash@gemini"},
+      "arbiter": {"model": "deepseek-chat@deepseek"},
+      "endpoints": {
+        "ollama": {"base_url": "http://host.k3s.internal:11434/v1"},
+        "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key_env": "GEMINI_API_KEY"},
+        "deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"}
+      },
+      "apps": {
+        "dispatcher": {
+          "app_id": 0,
+          "installation_id": 0,
+          "private_key_path": "/etc/fabriquilla/keys/dispatcher.pem"
+        },
+        "worker": {
+          "app_id": 0,
+          "installation_id": 0,
+          "private_key_path": "/etc/fabriquilla/keys/worker.pem"
+        },
+        "committer": {
+          "app_id": 0,
+          "installation_id": 0,
+          "private_key_path": "/etc/fabriquilla/keys/committer.pem"
+        }
+      },
+      "poll_interval": "30s",
+      "max_iterations": 3,
+      "max_cost_budget": 100000,
+      "max_phase_duration": "15m",
+      "max_phase_retries": 2,
+      "shadow_mode": true,
+      "max_files_changed": 20,
+      "max_pr_size_lines": 500,
+      "max_issues_per_hour": 5,
+      "max_issues_per_day": 20,
+      "repos": [
+        {
+          "owner": "ruromero",
+          "repo": "la-fabriquilla-test-fixture",
+          "language": "go"
+        }
+      ]
+    }
