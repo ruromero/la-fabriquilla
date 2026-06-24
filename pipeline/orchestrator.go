@@ -43,17 +43,17 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 	commentHistory := loadHumanComments(ctx, o.GH, issue.Number)
 
 	state := &State{
-		RepoOwner:             o.GH.Owner(),
-		RepoName:              o.GH.Repo(),
-		IssueNumber:           issue.Number,
-		Phase:                 "init",
-		IssueTitle:            issueTitle,
-		IssueBody:             issueBody,
-		CommentHistory:        commentHistory,
-		Summaries:             rc.Summaries(),
-		Conventions:           rc.Conventions(),
-		IncludeDocs:           o.IncludeDocs,
-		StartedAt:             time.Now(),
+		RepoOwner:      o.GH.Owner(),
+		RepoName:       o.GH.Repo(),
+		IssueNumber:    issue.Number,
+		Phase:          "init",
+		IssueTitle:     issueTitle,
+		IssueBody:      issueBody,
+		CommentHistory: commentHistory,
+		Summaries:      rc.Summaries(),
+		Conventions:    rc.Conventions(),
+		IncludeDocs:    o.IncludeDocs,
+		StartedAt:      time.Now(),
 	}
 
 	sess, err := harness.CloneAndStartSerena(ctx, o.GH, o.Config.Serena)
