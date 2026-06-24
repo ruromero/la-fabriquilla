@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fabriquilla
+  namespace: fabriquilla
+  labels:
+    app: fabriquilla
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fabriquilla
+  template:
+    metadata:
+      labels:
+        app: fabriquilla
+    spec:
+      containers:
+        - name: dispatcher
+          image: ghcr.io/ruromero/fabriquilla:latest
+          args:
+            - --config
+            - /etc/fabriquilla/config.json
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fabriquilla-creds
+                  key: GEMINI_API_KEY
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fabriquilla-creds
+                  key: DEEPSEEK_API_KEY
+            - name: FABRIQUILLA_DISPATCHER_KEY_PATH
+              value: /etc/fabriquilla/keys/dispatcher.pem
+            - name: FABRIQUILLA_WORKER_KEY_PATH
+              value: /etc/fabriquilla/keys/worker.pem
+            - name: FABRIQUILLA_COMMITTER_KEY_PATH
+              value: /etc/fabriquilla/keys/committer.pem
+          volumeMounts:
+            - name: config
+              mountPath: /etc/fabriquilla
+              readOnly: true
+            - name: keys
+              mountPath: /etc/fabriquilla/keys
+              readOnly: true
+            - name: state
+              mountPath: /data/pipeline
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 100m
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: fabriquilla-config
+        - name: keys
+          secret:
+            secretName: fabriquilla-creds
+            items:
+              - key: dispatcher.pem
+                path: dispatcher.pem
+              - key: worker.pem
+                path: worker.pem
+              - key: committer.pem
+                path: committer.pem
+        - name: state
+          persistentVolumeClaim:
+            claimName: fabriquilla-state
