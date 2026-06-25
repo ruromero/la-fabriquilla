@@ -1,0 +1,4 @@
+{"issue_number":10,"phase":"planner","model":"qwen3:30b-a3b","prompt_tokens":2000,"completion_tokens":500,"tool_calls":0,"duration":"5.2s","started_at":"2025-06-20T10:00:00Z"}
+{"issue_number":10,"phase":"designer","model":"qwen3:30b-a3b","prompt_tokens":3000,"completion_tokens":1200,"tool_calls":2,"duration":"18.1s","started_at":"2025-06-20T10:01:00Z"}
+{"issue_number":10,"phase":"coder","model":"qwen3:30b-a3b","prompt_tokens":4500,"completion_tokens":2000,"tool_calls":5,"duration":"45.3s","started_at":"2025-06-20T10:02:00Z"}
+{"issue_number":10,"phase":"reviewer","model":"gemma3:27b","prompt_tokens":3500,"completion_tokens":800,"tool_calls":1,"duration":"12.0s","started_at":"2025-06-20T10:03:00Z"}

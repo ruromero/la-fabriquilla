@@ -1,7 +1,10 @@
 package traces
 
 import (
+	"bufio"
 	"encoding/json"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -60,16 +63,29 @@ func TestAuditTrace_CleanTrace(t *testing.T) {
 }
 
 func TestAuditTrace_CleanGoldenFile(t *testing.T) {
-	golden := []string{
-		`{"issue_number":10,"phase":"planner","model":"qwen3:30b-a3b","prompt_tokens":2000,"completion_tokens":500,"tool_calls":0,"duration":"5.2s","started_at":"2025-06-20T10:00:00Z"}`,
-		`{"issue_number":10,"phase":"designer","model":"qwen3:30b-a3b","prompt_tokens":3000,"completion_tokens":1200,"tool_calls":2,"duration":"18.1s","started_at":"2025-06-20T10:01:00Z"}`,
-		`{"issue_number":10,"phase":"coder","model":"qwen3:30b-a3b","prompt_tokens":4500,"completion_tokens":2000,"tool_calls":5,"duration":"45.3s","started_at":"2025-06-20T10:02:00Z"}`,
-		`{"issue_number":10,"phase":"reviewer","model":"gemma3:27b","prompt_tokens":3500,"completion_tokens":800,"tool_calls":1,"duration":"12.0s","started_at":"2025-06-20T10:03:00Z"}`,
+	f, err := os.Open("testdata/golden_traces.jsonl")
+	if err != nil {
+		t.Fatalf("open golden file: %v", err)
 	}
-	for i, entry := range golden {
-		if err := AuditTrace([]byte(entry)); err != nil {
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	i := 0
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		if err := AuditTrace(line); err != nil {
 			t.Errorf("golden entry %d flagged: %v", i, err)
 		}
+		i++
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("reading golden file: %v", err)
+	}
+	if i == 0 {
+		t.Fatal("golden file was empty")
 	}
 }
 
@@ -92,4 +108,54 @@ func TestAuditTrace_EmptyEntry(t *testing.T) {
 	if err := AuditTrace([]byte("{}")); err != nil {
 		t.Errorf("empty entry flagged: %v", err)
 	}
+}
+
+func TestAuditLogLine_ExtractsAndScans(t *testing.T) {
+	traceJSON := `{"issue_number":10,"phase":"coder","model":"qwen3:30b-a3b","prompt_tokens":1500,"completion_tokens":800,"tool_calls":3,"duration":"12.5s","started_at":"2025-06-20T10:00:00Z"}`
+	slogLine := fmt.Sprintf(`{"time":"2025-06-20T10:00:12Z","level":"INFO","msg":"agent_trace","trace":%s}`, mustQuoteJSON(traceJSON))
+
+	if err := AuditLogLine([]byte(slogLine)); err != nil {
+		t.Errorf("clean slog line flagged: %v", err)
+	}
+}
+
+func TestAuditLogLine_CatchesEscapedSecrets(t *testing.T) {
+	tests := []struct {
+		name  string
+		trace string
+	}{
+		{"password in trace", `{"output":"password='hunter2!'"}`},
+		{"GitHub token in trace", `{"output":"ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij"}`},
+		{"bearer token in trace", `{"output":"Bearer eyJhbGciOiJIUzI1NiJ9.xxxxx.zzzzz"}`},
+		{"connection string in trace", `{"output":"postgresql://admin:s3cret@db.internal:5432/prod"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			slogLine := fmt.Sprintf(`{"time":"2025-06-20T10:00:12Z","level":"INFO","msg":"agent_trace","trace":%s}`, mustQuoteJSON(tt.trace))
+			if err := AuditLogLine([]byte(slogLine)); err == nil {
+				t.Errorf("AuditLogLine did not detect %s in slog line", tt.name)
+			}
+		})
+	}
+}
+
+func TestAuditLogLine_NoTraceField(t *testing.T) {
+	line := `{"time":"2025-06-20T10:00:12Z","level":"INFO","msg":"other_event","key":"value"}`
+	if err := AuditLogLine([]byte(line)); err != nil {
+		t.Errorf("line without trace field flagged: %v", err)
+	}
+}
+
+func TestAuditLogLine_InvalidJSON(t *testing.T) {
+	if err := AuditLogLine([]byte("not json")); err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+// mustQuoteJSON returns s as a JSON-encoded string value (with escaping),
+// simulating what slog's JSON handler does to string attributes.
+func mustQuoteJSON(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
