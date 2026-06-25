@@ -1,7 +1,6 @@
 package traces
 
 import (
-	"encoding/json"
 	"log/slog"
 	"time"
 )
@@ -21,10 +20,5 @@ type Trace struct {
 }
 
 func Log(t Trace) {
-	data, err := json.Marshal(t)
-	if err != nil {
-		slog.Error("failed to marshal trace", "error", err)
-		return
-	}
-	slog.Info("agent_trace", "trace", string(data))
+	slog.Info("agent_trace", "trace", slog.AnyValue(t))
 }

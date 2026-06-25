@@ -2,8 +2,10 @@ package traces
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -150,6 +152,43 @@ func TestAuditLogLine_NoTraceField(t *testing.T) {
 func TestAuditLogLine_InvalidJSON(t *testing.T) {
 	if err := AuditLogLine([]byte("not json")); err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestAuditLogLine_RealSlogOutput(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	slog.SetDefault(logger)
+	defer slog.SetDefault(slog.Default())
+
+	Log(Trace{
+		IssueNumber:  42,
+		Phase:        "coder",
+		Model:        "qwen3:30b-a3b",
+		PromptTokens: 1500,
+		CompTokens:   800,
+		ToolCalls:    3,
+		Duration:     "12.5s",
+		StartedAt:    time.Date(2025, 6, 20, 10, 0, 0, 0, time.UTC),
+	})
+
+	line := bytes.TrimSpace(buf.Bytes())
+	if len(line) == 0 {
+		t.Fatal("Log produced no output")
+	}
+
+	if err := AuditLogLine(line); err != nil {
+		t.Errorf("real slog output flagged: %v", err)
+	}
+
+	var record map[string]json.RawMessage
+	if err := json.Unmarshal(line, &record); err != nil {
+		t.Fatalf("slog output is not valid JSON: %v", err)
+	}
+	raw := record["trace"]
+	var nested string
+	if json.Unmarshal(raw, &nested) == nil {
+		t.Error("trace field is still double-encoded as a string; expected a JSON object")
 	}
 }
 
