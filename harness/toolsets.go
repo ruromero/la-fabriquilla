@@ -48,6 +48,24 @@ func BuildGatherTools(rc *RepoContext, gh *github.Client, serena *mcp.Client) ([
 	return allTools, composite
 }
 
+func BuildDesignerTools(rc *RepoContext, gh *github.Client, serena *mcp.Client) ([]inference.Tool, inference.ToolHandler) {
+	contextHandler := NewContextToolHandler(rc, gh)
+	contextTools := ContextTools()
+
+	if serena == nil {
+		return contextTools, contextHandler
+	}
+
+	serenaReadTools := FilterTools(serena.Tools(), SerenaGatherAllowed)
+
+	composite := NewCompositeToolHandler()
+	composite.Register(contextTools, contextHandler)
+	composite.Register(serenaReadTools, serena)
+
+	allTools := append(contextTools, serenaReadTools...)
+	return allTools, composite
+}
+
 func BuildCoderTools(serena *mcp.Client) ([]inference.Tool, inference.ToolHandler) {
 	if serena == nil {
 		return nil, nil
