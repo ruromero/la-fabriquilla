@@ -323,9 +323,9 @@ auto-dismiss to prevent deadlock. This deadlock prevention is shipped.
 1. Human creates GitHub issue, adds label "fabriquilla:ready"
 
 2. Dispatcher polls GitHub, finds issue
-   ├── Checks repo readiness (required files)
+   ├── Checks repo readiness (CODEOWNERS, .serena)
    ├── Swaps label: fabriquilla:ready → fabriquilla:in-progress
-   ├── Loads repo context (README, ARCHITECTURE, CONVENTIONS)
+   ├── Loads repo context (from include_docs config)
    ├── Sanitizes issue title/body
    ├── Loads human comment history
    ├── Initializes pipeline State, saves to disk
@@ -426,14 +426,17 @@ No guardrail depends on LLM judgment.
 The committer refuses to commit changes to these paths:
 
 ```
-.github/workflows/*     CI/CD pipelines
-CODEOWNERS               permission boundaries
-.pr_agent.toml           review tool configuration
-CONVENTIONS.md           agent instructions
-ARCHITECTURE.md          system design docs
-CLAUDE.md                agent context
-.serena/*                MCP configuration
-deploy/*                 k8s manifests and sandbox configs
+.github/workflows/*                CI/CD pipelines
+.github/copilot-instructions.md    agent instructions
+CODEOWNERS                         permission boundaries
+.pr_agent.toml                     review tool configuration
+CONVENTIONS.md                     agent instructions
+ARCHITECTURE.md                    system design docs
+CLAUDE.md                          agent instructions
+AGENTS.md                          agent instructions
+GEMINI.md                          agent instructions
+.serena/*                          MCP configuration
+deploy/*                           k8s manifests and sandbox configs
 ```
 
 Enforced by `pipeline.ValidateFiles()`. If any file matches a blocked

@@ -45,7 +45,7 @@ func main() {
 	coderTools, coderHandler := harness.BuildCoderTools(serenaClient)
 
 	gh := helpers.MustGitHubClientForApp(cfg, "worker", state)
-	rc := harness.LoadRepoContext(ctx, gh)
+	rc := harness.LoadRepoContext(ctx, gh, state.IncludeDocs)
 	gatherTools, gatherHandler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()

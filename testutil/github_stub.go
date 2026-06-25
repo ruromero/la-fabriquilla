@@ -155,7 +155,27 @@ func (mc *MemoryClient) GetFileContent(_ context.Context, path string) (string, 
 }
 
 func (mc *MemoryClient) CheckReadiness(_ context.Context) (github.ReadinessResult, error) {
-	return github.ReadinessResult{Ready: true}, nil
+	var missing []string
+
+	codeownersFound := false
+	for _, path := range []string{"CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"} {
+		if _, ok := mc.files[path]; ok {
+			codeownersFound = true
+			break
+		}
+	}
+	if !codeownersFound {
+		missing = append(missing, "CODEOWNERS")
+	}
+
+	if _, ok := mc.files[".serena"]; !ok {
+		missing = append(missing, ".serena")
+	}
+
+	return github.ReadinessResult{
+		Ready:   len(missing) == 0,
+		Missing: missing,
+	}, nil
 }
 
 func (mc *MemoryClient) CloneShallow(_ context.Context) (string, func(), error) {

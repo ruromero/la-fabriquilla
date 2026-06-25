@@ -26,6 +26,7 @@ type Orchestrator struct {
 	RunPhase     PhaseRunner
 	SandboxImage string
 	ConfigPath   string
+	IncludeDocs  []string
 }
 
 // ProcessIssue runs the full pipeline for a single GitHub issue and returns
@@ -35,7 +36,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 
 	key := StateKey(o.GH.Owner(), o.GH.Repo(), issue.Number)
 
-	rc := harness.LoadRepoContext(ctx, o.GH)
+	rc := harness.LoadRepoContext(ctx, o.GH, o.IncludeDocs)
 
 	issueTitle := sandbox.SanitizeInput(issue.Title)
 	issueBody := sandbox.SanitizeInput(issue.Body)
@@ -51,6 +52,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 		CommentHistory: commentHistory,
 		Summaries:      rc.Summaries(),
 		Conventions:    rc.Conventions(),
+		IncludeDocs:    o.IncludeDocs,
 		StartedAt:      time.Now(),
 	}
 

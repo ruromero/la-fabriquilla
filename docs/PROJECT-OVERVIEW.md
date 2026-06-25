@@ -565,14 +565,17 @@ Before committing, all file paths are validated:
 The committer refuses to modify these paths:
 
 ```
-.github/workflows/*    CI/CD pipelines
-CODEOWNERS             permission boundaries
-.pr_agent.toml         review tool config
-CONVENTIONS.md         agent instructions
-ARCHITECTURE.md        system design docs
-CLAUDE.md              agent context
-.serena/*              MCP configuration
-deploy/*               k8s manifests, sandbox configs
+.github/workflows/*                CI/CD pipelines
+.github/copilot-instructions.md    agent instructions
+CODEOWNERS                         permission boundaries
+.pr_agent.toml                     review tool config
+CONVENTIONS.md                     agent instructions
+ARCHITECTURE.md                    system design docs
+CLAUDE.md                          agent instructions
+AGENTS.md                          agent instructions
+GEMINI.md                          agent instructions
+.serena/*                          MCP configuration
+deploy/*                           k8s manifests, sandbox configs
 ```
 
 If any file matches, the issue gets labeled `fabriquilla:needs-human`.
@@ -667,17 +670,18 @@ fabriquilla:in-progress ──→ fabriquilla:done
 
 ### Repo Readiness
 
-Before processing any issue, the dispatcher checks for required files:
+Before processing any issue, the dispatcher checks for required structural files:
 
-- `README.md`
-- `ARCHITECTURE.md`
-- `CONVENTIONS.md`
 - `CODEOWNERS` (checked in root, `.github/`, and `docs/`)
-- `CLAUDE.md`
 - `.serena/` directory
 
 Missing files cause: label swapped to `fabriquilla:requirements`, comment
 posted explaining what's missing, issue not processed.
+
+Context documents are loaded from the per-repo `include_docs` config (defaults
+to `README.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`). Missing docs are skipped;
+a warning is logged if none are found. Subpaths are supported
+(e.g. `docs/ARCHITECTURE.md`).
 
 ### PR Creation
 

@@ -3,25 +3,17 @@ package github
 import (
 	"context"
 	"fmt"
-	"strings"
 )
-
-var requiredFiles = []string{
-	"CODEOWNERS",
-	"CLAUDE.md",
-	"CONVENTIONS.md",
-	"ARCHITECTURE.md",
-	"README.md",
-	".serena",
-}
 
 type ReadinessResult struct {
 	Ready   bool
 	Missing []string
 }
 
-// CheckReadiness verifies the repo has the minimum required files
-// before the factory will accept work from it.
+// CheckReadiness verifies the repo has the minimum required structural
+// files before the factory will accept work from it. Context documents
+// (README, ARCHITECTURE, etc.) are configured per repo via include_docs
+// and loaded best-effort by the harness.
 func (c *Client) CheckReadiness(ctx context.Context) (ReadinessResult, error) {
 	var missing []string
 
@@ -41,17 +33,12 @@ func (c *Client) CheckReadiness(ctx context.Context) (ReadinessResult, error) {
 		missing = append(missing, "CODEOWNERS")
 	}
 
-	for _, file := range requiredFiles {
-		if strings.EqualFold(file, "CODEOWNERS") {
-			continue
-		}
-		exists, err := c.FileExists(ctx, file)
-		if err != nil {
-			return ReadinessResult{}, fmt.Errorf("check %s: %w", file, err)
-		}
-		if !exists {
-			missing = append(missing, file)
-		}
+	exists, err := c.FileExists(ctx, ".serena")
+	if err != nil {
+		return ReadinessResult{}, fmt.Errorf("check .serena: %w", err)
+	}
+	if !exists {
+		missing = append(missing, ".serena")
 	}
 
 	return ReadinessResult{
