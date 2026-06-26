@@ -1,0 +1,17 @@
+{
+  "name": "verify-symbols",
+  "phase": "designer",
+  "inputs": {
+    "issue_title": "Add retry logic to inference client",
+    "plan_summary": "Add exponential backoff retry to inference/client.go for transient HTTP errors (429, 502, 503). Wrap the existing doRequest method.",
+    "repo_language": "go",
+    "repo_structure": "cmd/dispatcher/ config/ github/ inference/ mcp/ harness/"
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "inference/client.go"},
+    {"type": "output_contains", "value": "doRequest"},
+    {"type": "output_not_contains", "value": "inference/retry_manager.go"},
+    {"type": "output_not_contains", "value": "RetryManager"}
+  ],
+  "pass_threshold": "6/10"
+}

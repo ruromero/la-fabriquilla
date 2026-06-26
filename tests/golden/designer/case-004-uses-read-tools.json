@@ -1,0 +1,16 @@
+{
+  "name": "designer-uses-read-tools",
+  "phase": "designer",
+  "inputs": {
+    "plan": "PLAN:\n1. Add a MaxRetries field to config/config.go Config struct\n2. Use it in inference/client.go to retry failed requests",
+    "research_context": "",
+    "conventions": "Errors wrap with fmt.Errorf. Use log/slog for logging. Zero external dependencies."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "config/config.go"},
+    {"type": "output_contains", "value": "inference/client.go"},
+    {"type": "output_not_contains", "value": "retry_service.go"},
+    {"type": "llm_judge", "value": "Check the design output against these criteria:\n1. References at least two existing files by path\n2. Describes function signatures with parameter and return types\n3. Does NOT invent files or packages that were not in the plan or repo structure\n4. Does NOT propose external Go dependencies"}
+  ],
+  "pass_threshold": "7/10"
+}
