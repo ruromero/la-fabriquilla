@@ -87,7 +87,7 @@ func (a *adapters) runDesigner(tc eval.TestCase, _ int) (string, []eval.FileStat
 	defer cancel()
 	in := tc.Inputs
 	res, err := agents.DesignWithUsage(ctx, a.agentClient, a.agentModel,
-		in["plan"], in["research_context"], in["conventions"])
+		in["plan"], in["research_context"], in["conventions"], nil, nil)
 	if err != nil {
 		return "", nil, err
 	}

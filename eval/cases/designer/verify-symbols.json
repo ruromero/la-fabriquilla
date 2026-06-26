@@ -1,0 +1,16 @@
+{
+  "name": "verify-symbols",
+  "phase": "designer",
+  "inputs": {
+    "plan": "Add exponential backoff retry to inference/client.go for transient HTTP errors (429, 502, 503). Wrap the existing doRequest method.",
+    "research_context": "",
+    "conventions": "Errors wrap with fmt.Errorf. Use log/slog for logging. Zero external dependencies."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "inference/client.go"},
+    {"type": "output_contains", "value": "doRequest"},
+    {"type": "output_not_contains", "value": "inference/retry_manager.go"},
+    {"type": "output_not_contains", "value": "RetryManager"}
+  ],
+  "pass_threshold": "6/10"
+}
