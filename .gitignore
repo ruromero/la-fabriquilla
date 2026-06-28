@@ -57,3 +57,4 @@ docs/benchmarks/README.md
 # Editor/IDE
 # .idea/
 # .vscode/
+deploy/k8s/configmap.yaml
