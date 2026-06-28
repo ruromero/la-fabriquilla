@@ -17,6 +17,7 @@ type Config struct {
 	MaxCostBudget    int                       `json:"max_cost_budget"`
 	MaxPhaseDuration Duration                  `json:"max_phase_duration"`
 	MaxPhaseRetries  int                       `json:"max_phase_retries"`
+	MaxReplans       int                       `json:"max_replans"`
 	PhaseDurations   map[string]Duration       `json:"phase_durations,omitempty"`
 	ShadowMode       bool                      `json:"shadow_mode"`
 	MaxFilesChanged  int                       `json:"max_files_changed"`
@@ -267,6 +268,7 @@ func LoadConfig(path string) (Config, error) {
 		MaxCostBudget:    100000,
 		MaxPhaseDuration: Duration{15 * time.Minute},
 		MaxPhaseRetries:  2,
+		MaxReplans:       1,
 		ShadowMode:       true,
 		MaxFilesChanged:  20,
 		MaxPRSizeLines:   500,
