@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/pipeline"
@@ -30,7 +31,16 @@ Rules:
 - Include tests
 - Update documentation if behavior changes
 - Follow existing code style and conventions
-- Do not add unnecessary dependencies`
+- Do not add unnecessary dependencies
+
+Before writing any code, use your tools to verify the design's key assumptions:
+- Do the files, functions, and types referenced in the design actually exist?
+- Is the architecture consistent with what you observe in the codebase?
+
+If the design cannot be implemented as specified — references nonexistent code,
+conflicts with the actual architecture, or underestimates scope beyond a single PR —
+respond with PLAN_INFEASIBLE: followed by a concrete explanation of what is wrong
+and what the plan should account for instead. Do not attempt to write code.`
 
 // CodeResult holds the coder output and token usage.
 type CodeResult struct {
@@ -39,6 +49,16 @@ type CodeResult struct {
 	CompTokens   int
 	ToolCalls    int
 	Model        string
+}
+
+const planInfeasiblePrefix = "PLAN_INFEASIBLE:"
+
+// ParseCoderOutput checks whether the coder response signals plan infeasibility.
+func ParseCoderOutput(content string) (outcome, reason string) {
+	if len(content) >= len(planInfeasiblePrefix) && content[:len(planInfeasiblePrefix)] == planInfeasiblePrefix {
+		return "plan_infeasible", strings.TrimSpace(content[len(planInfeasiblePrefix):])
+	}
+	return "success", ""
 }
 
 func Code(ctx context.Context, cl *inference.Client, model, design, researchContext, conventions string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {

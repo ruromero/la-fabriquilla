@@ -71,6 +71,17 @@ func main() {
 		CumCostUSD:      state.TotalCostUSD,
 	})
 
+	outcome, reason := agents.ParseCoderOutput(codeResult.Content)
+	if outcome == "plan_infeasible" {
+		slog.Info("coder signaled plan infeasible", "reason", reason)
+		state.CoderOutcome = "plan_infeasible"
+		state.InfeasibleReason = reason
+		state.Phase = "code-done"
+		helpers.MustSaveState(state)
+		return
+	}
+
+	state.CoderOutcome = "success"
 	code := codeResult.Content
 
 	start = time.Now()
