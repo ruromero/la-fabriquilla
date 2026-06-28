@@ -351,7 +351,8 @@ func (c *Client) CreateCommit(ctx context.Context, branch, message string, files
 		return "", fmt.Errorf("create commit: %w", err)
 	}
 
-	if err := c.patch(ctx, refURL, map[string]string{"sha": newCommit.SHA}, nil); err != nil {
+	updateRefURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/heads/%s", c.owner, c.repo, branch)
+	if err := c.patch(ctx, updateRefURL, map[string]string{"sha": newCommit.SHA}, nil); err != nil {
 		return "", fmt.Errorf("update branch ref: %w", err)
 	}
 
