@@ -375,3 +375,85 @@ func TestArbiterStateNewFormatPreferred(t *testing.T) {
 		t.Errorf("DismissedKeys = %v, want [new key] (new format should take precedence)", as.DismissedKeys)
 	}
 }
+
+func TestCoderOutcomeRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+
+	original := &State{
+		RepoOwner:        "ruromero",
+		RepoName:         "la-fabriquilla",
+		IssueNumber:      88,
+		Phase:            "code-done",
+		IssueTitle:       "test",
+		IssueBody:        "test",
+		CoderOutcome:     "plan_infeasible",
+		InfeasibleReason: "Function Foo does not exist in pkg/bar.go",
+		ReplanCount:      1,
+		ReplanFeedback:   "Function Foo does not exist in pkg/bar.go",
+		StartedAt:        time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC),
+	}
+
+	if err := SaveState(path, original); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+
+	loaded, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+
+	if loaded.CoderOutcome != "plan_infeasible" {
+		t.Errorf("CoderOutcome = %q, want %q", loaded.CoderOutcome, "plan_infeasible")
+	}
+	if loaded.InfeasibleReason != original.InfeasibleReason {
+		t.Errorf("InfeasibleReason = %q, want %q", loaded.InfeasibleReason, original.InfeasibleReason)
+	}
+	if loaded.ReplanCount != 1 {
+		t.Errorf("ReplanCount = %d, want 1", loaded.ReplanCount)
+	}
+	if loaded.ReplanFeedback != original.ReplanFeedback {
+		t.Errorf("ReplanFeedback = %q, want %q", loaded.ReplanFeedback, original.ReplanFeedback)
+	}
+}
+
+func TestCoderOutcomeOmittedWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+
+	original := &State{
+		RepoOwner:   "ruromero",
+		RepoName:    "la-fabriquilla",
+		IssueNumber: 88,
+		Phase:       "code-done",
+		IssueTitle:  "test",
+		IssueBody:   "test",
+		StartedAt:   time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC),
+	}
+
+	if err := SaveState(path, original); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if _, exists := raw["coder_outcome"]; exists {
+		t.Error("coder_outcome should be omitted when empty")
+	}
+	if _, exists := raw["infeasible_reason"]; exists {
+		t.Error("infeasible_reason should be omitted when empty")
+	}
+	if _, exists := raw["replan_count"]; exists {
+		t.Error("replan_count should be omitted when empty")
+	}
+	if _, exists := raw["replan_feedback"]; exists {
+		t.Error("replan_feedback should be omitted when empty")
+	}
+}

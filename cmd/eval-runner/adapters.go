@@ -74,7 +74,7 @@ func (a *adapters) runPlanner(tc eval.TestCase, _ int) (string, []eval.FileState
 	in := tc.Inputs
 	res, err := agents.Plan(ctx, a.agentClient, a.agentModel,
 		in["issue_title"], in["issue_body"], in["research_context"],
-		in["gathered_context"], in["conventions"], in["comment_history"])
+		in["gathered_context"], in["conventions"], in["comment_history"], "")
 	if err != nil {
 		return "", nil, err
 	}

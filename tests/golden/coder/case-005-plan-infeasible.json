@@ -1,0 +1,15 @@
+{
+  "name": "coder-detects-infeasible-plan",
+  "phase": "coder",
+  "inputs": {
+    "issue_title": "Add caching layer to user service",
+    "plan": "1. Modify pkg/cache/redis_adapter.go to add a TTL-based cache wrapper around UserService.GetByID\n2. Update internal/service/user.go to call cache.WrapWithTTL() before database lookup\n3. Add tests in pkg/cache/redis_adapter_test.go",
+    "gathered_context": "The project has no pkg/cache/ directory. There is no redis_adapter.go file. The user service is at internal/service/user.go and uses a PostgreSQL repository pattern. No caching infrastructure exists in the project.",
+    "conventions": "Errors wrap with fmt.Errorf. No external dependencies beyond stdlib."
+  },
+  "assertions": [
+    {"type": "output_contains", "value": "PLAN_INFEASIBLE"},
+    {"type": "llm_judge", "value": "The coder should detect that the plan references files and functions that do not exist (pkg/cache/redis_adapter.go, cache.WrapWithTTL). It should return PLAN_INFEASIBLE: with a concrete explanation of what is wrong. It should NOT attempt to generate code implementing the plan. Check that the response starts with PLAN_INFEASIBLE: and explains which referenced symbols or files are missing."}
+  ],
+  "pass_threshold": "7/10"
+}

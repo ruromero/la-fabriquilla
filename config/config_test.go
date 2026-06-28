@@ -459,3 +459,48 @@ func TestLoadConfigNewSchemaPassthrough(t *testing.T) {
 		t.Errorf("arbiter got model=%q url=%q key=%q", model, baseURL, apiKey)
 	}
 }
+
+func TestLoadConfig_MaxReplansDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	minimal := `{
+		"default_model": "test@ollama",
+		"endpoints": {"ollama": {"base_url": "http://localhost:11434/v1"}},
+		"repos": [{"owner": "test", "repo": "test", "token": "tok"}]
+	}`
+	if err := os.WriteFile(path, []byte(minimal), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.MaxReplans != 1 {
+		t.Errorf("MaxReplans = %d, want 1", cfg.MaxReplans)
+	}
+}
+
+func TestLoadConfig_MaxReplansOverride(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	jsonCfg := `{
+		"default_model": "test@ollama",
+		"max_replans": 3,
+		"endpoints": {"ollama": {"base_url": "http://localhost:11434/v1"}},
+		"repos": [{"owner": "test", "repo": "test", "token": "tok"}]
+	}`
+	if err := os.WriteFile(path, []byte(jsonCfg), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.MaxReplans != 3 {
+		t.Errorf("MaxReplans = %d, want 3", cfg.MaxReplans)
+	}
+}

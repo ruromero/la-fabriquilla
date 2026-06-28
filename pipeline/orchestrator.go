@@ -164,6 +164,19 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
 			return state, fmt.Errorf("scope/budget exceeded after code: %w", err)
 		}
+		if state.CoderOutcome == "plan_infeasible" {
+			log.Info("coder signaled plan infeasible, entering replan loop")
+			if err := o.replanLoop(ctx, key, statePath, issue.Number); err != nil {
+				return o.bestState(ctx, key, state), fmt.Errorf("replan loop: %w", err)
+			}
+			state, err = o.Store.Load(ctx, key)
+			if err != nil {
+				return state, fmt.Errorf("reload state after replan: %w", err)
+			}
+			if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
+				return state, fmt.Errorf("budget exceeded after replan: %w", err)
+			}
+		}
 		if err := CheckPRScope(state.Files, o.Config.MaxFilesChanged, o.Config.MaxPRSizeLines); err != nil {
 			return state, fmt.Errorf("scope check: %w", err)
 		}
@@ -253,6 +266,104 @@ func (o *Orchestrator) reviewIterateLoop(ctx context.Context, key, statePath str
 
 	slog.Warn("max review iterations reached", "max", o.Config.MaxIterations)
 	return nil
+}
+
+// replanLoop re-runs planner → designer → coder when the coder signals
+// plan infeasibility, up to Config.MaxReplans times.
+func (o *Orchestrator) replanLoop(ctx context.Context, key, statePath string, issueNumber int) error {
+	for i := 0; i < o.Config.MaxReplans; i++ {
+		slog.Info("starting replan cycle", "attempt", i+1, "max", o.Config.MaxReplans)
+
+		state, err := o.Store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state for replan: %w", err)
+		}
+
+		reason := sandbox.SanitizeInput(state.InfeasibleReason)
+
+		state.PlanOutcome = ""
+		state.PlanContent = ""
+		state.Design = ""
+		state.Code = ""
+		state.Review = nil
+		state.ArbiterResult = nil
+		state.Files = nil
+		state.CoderOutcome = ""
+		state.InfeasibleReason = ""
+		state.ReplanFeedback = reason
+		state.ReplanCount++
+		if err := o.Store.Save(ctx, key, state); err != nil {
+			return fmt.Errorf("save cleaned state for replan: %w", err)
+		}
+
+		if err := o.RunPhase(ctx, o.Config, "planner", statePath, issueNumber, o.SandboxImage); err != nil {
+			return fmt.Errorf("replan planner (attempt %d): %w", i+1, err)
+		}
+		state, err = o.Store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after replan planner: %w", err)
+		}
+		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after replan planner: %w", err)
+		}
+
+		if state.PlanOutcome != "plan" {
+			if err := o.GH.AddLabel(ctx, issueNumber, "fabriquilla:needs-human"); err != nil {
+				slog.Warn("failed to add needs-human label during replan", "issue", issueNumber, "error", err)
+			}
+			comment := fmt.Sprintf("## Factory: Plan Infeasible\n\nThe coder determined the plan cannot be implemented as designed. "+
+				"Re-planning was attempted but the planner returned %q instead of a revised plan.\n\n"+
+				"**Infeasibility reason:**\n%s\n\nThis issue needs human attention.", state.PlanOutcome, reason)
+			if err := o.GH.CreateComment(ctx, issueNumber, comment); err != nil {
+				slog.Warn("failed to post replan escalation comment", "issue", issueNumber, "error", err)
+			}
+			return fmt.Errorf("replanner returned %q instead of plan", state.PlanOutcome)
+		}
+
+		if err := o.RunPhase(ctx, o.Config, "designer", statePath, issueNumber, o.SandboxImage); err != nil {
+			return fmt.Errorf("replan designer (attempt %d): %w", i+1, err)
+		}
+		state, err = o.Store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after replan designer: %w", err)
+		}
+		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after replan designer: %w", err)
+		}
+
+		if err := o.RunPhase(ctx, o.Config, "coder", statePath, issueNumber, o.SandboxImage); err != nil {
+			return fmt.Errorf("replan coder (attempt %d): %w", i+1, err)
+		}
+		state, err = o.Store.Load(ctx, key)
+		if err != nil {
+			return fmt.Errorf("reload state after replan coder: %w", err)
+		}
+		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
+			return fmt.Errorf("budget exceeded after replan coder: %w", err)
+		}
+
+		if state.CoderOutcome != "plan_infeasible" {
+			slog.Info("replan succeeded", "attempts", i+1)
+			return nil
+		}
+	}
+
+	state, err := o.Store.Load(ctx, key)
+	if err != nil {
+		return fmt.Errorf("reload state after replan exhausted: %w", err)
+	}
+
+	if err := o.GH.AddLabel(ctx, issueNumber, "fabriquilla:needs-human"); err != nil {
+		slog.Warn("failed to add needs-human label after replan exhausted", "issue", issueNumber, "error", err)
+	}
+	sanitizedReason := sandbox.SanitizeInput(state.InfeasibleReason)
+	comment := fmt.Sprintf("## Factory: Plan Infeasible\n\nThe coder determined the plan cannot be implemented as designed. "+
+		"Re-planning was attempted but did not produce a viable plan after %d attempt(s).\n\n"+
+		"**Last infeasibility reason:**\n%s\n\nThis issue needs human attention.", state.ReplanCount, sanitizedReason)
+	if err := o.GH.CreateComment(ctx, issueNumber, comment); err != nil {
+		slog.Warn("failed to post replan exhaustion comment", "issue", issueNumber, "error", err)
+	}
+	return fmt.Errorf("plan infeasible after %d replan attempts", state.ReplanCount)
 }
 
 // loadHumanComments fetches non-bot comments for an issue and returns them
