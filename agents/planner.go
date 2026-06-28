@@ -47,11 +47,7 @@ type PlanResult struct {
 	Model        string
 }
 
-func Plan(ctx context.Context, client *inference.Client, model, issueTitle, issueBody, researchContext, gatheredContext, conventions, commentHistory string) (PlanResult, error) {
-	if client == nil {
-		return PlanResult{}, fmt.Errorf("planner requires an API client (configure planner in config.json and set PLANNER_API_KEY)")
-	}
-
+func buildPlannerPrompt(issueTitle, issueBody, commentHistory, gatheredContext, conventions, researchContext, replanFeedback string) string {
 	userPrompt := fmt.Sprintf("## Issue: %s\n\n%s", issueTitle, issueBody)
 	if commentHistory != "" {
 		userPrompt += fmt.Sprintf("\n\n## Discussion\n\nPrevious comments on this issue (may contain answers to earlier questions):\n\n%s", commentHistory)
@@ -65,6 +61,18 @@ func Plan(ctx context.Context, client *inference.Client, model, issueTitle, issu
 	if researchContext != "" {
 		userPrompt += fmt.Sprintf("\n\n## Research Context\n\n%s", researchContext)
 	}
+	if replanFeedback != "" {
+		userPrompt += fmt.Sprintf("\n\n## Re-plan Feedback (from coder)\n\nThe previous plan was found infeasible during implementation. Reason:\n\n%s\n\nProduce a revised plan that accounts for this feedback.", replanFeedback)
+	}
+	return userPrompt
+}
+
+func Plan(ctx context.Context, client *inference.Client, model, issueTitle, issueBody, researchContext, gatheredContext, conventions, commentHistory, replanFeedback string) (PlanResult, error) {
+	if client == nil {
+		return PlanResult{}, fmt.Errorf("planner requires an API client (configure planner in config.json and set PLANNER_API_KEY)")
+	}
+
+	userPrompt := buildPlannerPrompt(issueTitle, issueBody, commentHistory, gatheredContext, conventions, researchContext, replanFeedback)
 
 	content, usage, err := client.SimpleChat(ctx, model, plannerSystemPrompt, userPrompt)
 	if err != nil {

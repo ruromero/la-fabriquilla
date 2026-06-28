@@ -32,7 +32,7 @@ func main() {
 	plan, err := agents.Plan(ctx, client, model,
 		state.IssueTitle, state.IssueBody,
 		state.ResearchContext, state.GatheredContext,
-		state.Conventions, state.CommentHistory)
+		state.Conventions, state.CommentHistory, state.ReplanFeedback)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("plan phase failed", "error", err)
