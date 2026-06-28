@@ -39,7 +39,7 @@ data:
       "max_cost_budget": 100000,
       "max_phase_duration": "15m",
       "max_phase_retries": 2,
-      "shadow_mode": true,
+      "shadow_mode": false,
       "max_files_changed": 20,
       "max_pr_size_lines": 500,
       "max_issues_per_hour": 5,
