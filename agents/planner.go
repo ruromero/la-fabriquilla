@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ruromero/la-fabriquilla/inference"
+	"github.com/ruromero/la-fabriquilla/sandbox"
 )
 
 const plannerSystemPrompt = `You are a software project planner. You are given a GitHub issue along with relevant project context that was gathered specifically for this issue.
@@ -62,7 +63,7 @@ func buildPlannerPrompt(issueTitle, issueBody, commentHistory, gatheredContext, 
 		userPrompt += fmt.Sprintf("\n\n## Research Context\n\n%s", researchContext)
 	}
 	if replanFeedback != "" {
-		userPrompt += fmt.Sprintf("\n\n## Re-plan Feedback (from coder)\n\nThe previous plan was found infeasible during implementation. Reason:\n\n%s\n\nProduce a revised plan that accounts for this feedback.", replanFeedback)
+		userPrompt += fmt.Sprintf("\n\n## Re-plan Feedback (from coder)\n\nThe previous plan was found infeasible during implementation. Reason:\n\n%s\n\nProduce a revised plan that accounts for this feedback.", sandbox.SanitizeInput(replanFeedback))
 	}
 	return userPrompt
 }

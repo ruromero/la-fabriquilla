@@ -492,7 +492,7 @@ func TestReplanLoop_ClearsStaleState(t *testing.T) {
 		s, _ := LoadState(sp)
 		switch binary {
 		case "planner":
-			if s.Design == "" && s.Code == "" && s.Review == nil && s.ArbiterResult == nil && len(s.Files) == 0 && s.CoderOutcome == "" && s.InfeasibleReason == "" {
+			if s.PlanOutcome == "" && s.PlanContent == "" && s.Design == "" && s.Code == "" && s.Review == nil && s.ArbiterResult == nil && len(s.Files) == 0 && s.CoderOutcome == "" && s.InfeasibleReason == "" {
 				plannerSawClean = true
 			}
 			s.PlanOutcome = "plan"
@@ -519,7 +519,7 @@ func TestReplanLoop_ClearsStaleState(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !plannerSawClean {
-		t.Error("planner should see cleaned state (no stale Design, Code, Review, Files, CoderOutcome, InfeasibleReason)")
+		t.Error("planner should see cleaned state (no stale PlanOutcome, PlanContent, Design, Code, Review, Files, CoderOutcome, InfeasibleReason)")
 	}
 }
 

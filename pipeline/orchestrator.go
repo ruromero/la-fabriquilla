@@ -281,6 +281,8 @@ func (o *Orchestrator) replanLoop(ctx context.Context, key, statePath string, is
 
 		reason := sandbox.SanitizeInput(state.InfeasibleReason)
 
+		state.PlanOutcome = ""
+		state.PlanContent = ""
 		state.Design = ""
 		state.Code = ""
 		state.Review = nil
@@ -306,11 +308,15 @@ func (o *Orchestrator) replanLoop(ctx context.Context, key, statePath string, is
 		}
 
 		if state.PlanOutcome != "plan" {
-			o.GH.AddLabel(ctx, issueNumber, "fabriquilla:needs-human")
+			if err := o.GH.AddLabel(ctx, issueNumber, "fabriquilla:needs-human"); err != nil {
+				slog.Warn("failed to add needs-human label during replan", "issue", issueNumber, "error", err)
+			}
 			comment := fmt.Sprintf("## Factory: Plan Infeasible\n\nThe coder determined the plan cannot be implemented as designed. "+
 				"Re-planning was attempted but the planner returned %q instead of a revised plan.\n\n"+
 				"**Infeasibility reason:**\n%s\n\nThis issue needs human attention.", state.PlanOutcome, reason)
-			o.GH.CreateComment(ctx, issueNumber, comment)
+			if err := o.GH.CreateComment(ctx, issueNumber, comment); err != nil {
+				slog.Warn("failed to post replan escalation comment", "issue", issueNumber, "error", err)
+			}
 			return fmt.Errorf("replanner returned %q instead of plan", state.PlanOutcome)
 		}
 
@@ -347,11 +353,16 @@ func (o *Orchestrator) replanLoop(ctx context.Context, key, statePath string, is
 		return fmt.Errorf("reload state after replan exhausted: %w", err)
 	}
 
-	o.GH.AddLabel(ctx, issueNumber, "fabriquilla:needs-human")
+	if err := o.GH.AddLabel(ctx, issueNumber, "fabriquilla:needs-human"); err != nil {
+		slog.Warn("failed to add needs-human label after replan exhausted", "issue", issueNumber, "error", err)
+	}
+	sanitizedReason := sandbox.SanitizeInput(state.InfeasibleReason)
 	comment := fmt.Sprintf("## Factory: Plan Infeasible\n\nThe coder determined the plan cannot be implemented as designed. "+
 		"Re-planning was attempted but did not produce a viable plan after %d attempt(s).\n\n"+
-		"**Last infeasibility reason:**\n%s\n\nThis issue needs human attention.", state.ReplanCount, state.InfeasibleReason)
-	o.GH.CreateComment(ctx, issueNumber, comment)
+		"**Last infeasibility reason:**\n%s\n\nThis issue needs human attention.", state.ReplanCount, sanitizedReason)
+	if err := o.GH.CreateComment(ctx, issueNumber, comment); err != nil {
+		slog.Warn("failed to post replan exhaustion comment", "issue", issueNumber, "error", err)
+	}
 	return fmt.Errorf("plan infeasible after %d replan attempts", state.ReplanCount)
 }
 
