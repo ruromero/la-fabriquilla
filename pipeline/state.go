@@ -60,6 +60,10 @@ type State struct {
 	ResearchContext   string        `json:"research_context,omitempty"`
 	PlanOutcome       string        `json:"plan_outcome,omitempty"`
 	PlanContent       string        `json:"plan_content,omitempty"`
+	CoderOutcome      string        `json:"coder_outcome,omitempty"`
+	InfeasibleReason  string        `json:"infeasible_reason,omitempty"`
+	ReplanCount       int           `json:"replan_count,omitempty"`
+	ReplanFeedback    string        `json:"replan_feedback,omitempty"`
 	Design            string        `json:"design,omitempty"`
 	Code              string        `json:"code,omitempty"`
 	Review            *ReviewState  `json:"review,omitempty"`
