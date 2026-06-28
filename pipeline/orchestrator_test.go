@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ruromero/la-fabriquilla/config"
+	"github.com/ruromero/la-fabriquilla/github"
 	"github.com/ruromero/la-fabriquilla/review"
 )
 
@@ -277,3 +278,302 @@ func TestReviewIterateLoop_StaleArbiterIgnoredWhenDisabled(t *testing.T) {
 		t.Errorf("expected 1 call (reviewer only, stale arbiter ignored), got %d", calls)
 	}
 }
+
+func TestReplanLoop_SucceedsOnSecondAttempt(t *testing.T) {
+	dir := t.TempDir()
+	state := &State{
+		IssueNumber:      1,
+		IssueTitle:       "test",
+		IssueBody:        "test",
+		Phase:            "code-done",
+		CoderOutcome:     "plan_infeasible",
+		InfeasibleReason: "Function Foo does not exist",
+		PlanOutcome:      "plan",
+		PlanContent:      "original plan",
+	}
+	statePath := writeTestState(t, dir, state)
+
+	store := NewFileStateStore(dir)
+	key := "state"
+
+	gh := &mockGHForReplan{}
+
+	plannerCalls := 0
+	designerCalls := 0
+	coderCalls := 0
+
+	runner := func(ctx context.Context, cfg *config.Config, binary, sp string, issueNumber int, sandboxImage string) error {
+		s, _ := LoadState(sp)
+		switch binary {
+		case "planner":
+			plannerCalls++
+			s.PlanOutcome = "plan"
+			s.PlanContent = "revised plan"
+			s.Phase = "plan-done"
+		case "designer":
+			designerCalls++
+			s.Design = "revised design"
+			s.Phase = "design-done"
+		case "coder":
+			coderCalls++
+			s.CoderOutcome = "success"
+			s.InfeasibleReason = ""
+			s.Code = `{"files":[]}`
+			s.Phase = "code-done"
+		}
+		SaveState(sp, s)
+		return nil
+	}
+
+	cfg := &config.Config{MaxReplans: 2, MaxCostBudget: 100000}
+	orch := makeOrch(cfg, store, runner, "")
+	orch.GH = gh
+
+	err := orch.replanLoop(context.Background(), key, statePath, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if plannerCalls != 1 {
+		t.Errorf("planner calls = %d, want 1", plannerCalls)
+	}
+	if designerCalls != 1 {
+		t.Errorf("designer calls = %d, want 1", designerCalls)
+	}
+	if coderCalls != 1 {
+		t.Errorf("coder calls = %d, want 1", coderCalls)
+	}
+
+	s, _ := store.Load(context.Background(), key)
+	if s.ReplanCount != 1 {
+		t.Errorf("ReplanCount = %d, want 1", s.ReplanCount)
+	}
+	if s.CoderOutcome != "success" {
+		t.Errorf("CoderOutcome = %q, want %q", s.CoderOutcome, "success")
+	}
+}
+
+func TestReplanLoop_CapExhausted(t *testing.T) {
+	dir := t.TempDir()
+	state := &State{
+		IssueNumber:      1,
+		IssueTitle:       "test",
+		IssueBody:        "test",
+		Phase:            "code-done",
+		CoderOutcome:     "plan_infeasible",
+		InfeasibleReason: "Function Foo does not exist",
+		PlanOutcome:      "plan",
+		PlanContent:      "original plan",
+	}
+	statePath := writeTestState(t, dir, state)
+
+	store := NewFileStateStore(dir)
+	key := "state"
+
+	gh := &mockGHForReplan{}
+
+	runner := func(ctx context.Context, cfg *config.Config, binary, sp string, issueNumber int, sandboxImage string) error {
+		s, _ := LoadState(sp)
+		switch binary {
+		case "planner":
+			s.PlanOutcome = "plan"
+			s.PlanContent = "another bad plan"
+			s.Phase = "plan-done"
+		case "designer":
+			s.Design = "another bad design"
+			s.Phase = "design-done"
+		case "coder":
+			s.CoderOutcome = "plan_infeasible"
+			s.InfeasibleReason = "Still infeasible"
+			s.Phase = "code-done"
+		}
+		SaveState(sp, s)
+		return nil
+	}
+
+	cfg := &config.Config{MaxReplans: 1, MaxCostBudget: 100000}
+	orch := makeOrch(cfg, store, runner, "")
+	orch.GH = gh
+
+	err := orch.replanLoop(context.Background(), key, statePath, 1)
+	if err == nil {
+		t.Fatal("expected error when replan cap exhausted")
+	}
+
+	hasLabel := false
+	for _, l := range gh.labels {
+		if l == "fabriquilla:needs-human" {
+			hasLabel = true
+		}
+	}
+	if !hasLabel {
+		t.Error("expected fabriquilla:needs-human label")
+	}
+	if len(gh.comments) == 0 {
+		t.Error("expected escalation comment")
+	}
+}
+
+func TestReplanLoop_PlannerReturnsNeedsInfo(t *testing.T) {
+	dir := t.TempDir()
+	state := &State{
+		IssueNumber:      1,
+		IssueTitle:       "test",
+		IssueBody:        "test",
+		Phase:            "code-done",
+		CoderOutcome:     "plan_infeasible",
+		InfeasibleReason: "missing symbols",
+		PlanOutcome:      "plan",
+		PlanContent:      "original plan",
+	}
+	statePath := writeTestState(t, dir, state)
+
+	store := NewFileStateStore(dir)
+	key := "state"
+
+	gh := &mockGHForReplan{}
+
+	runner := func(ctx context.Context, cfg *config.Config, binary, sp string, issueNumber int, sandboxImage string) error {
+		s, _ := LoadState(sp)
+		if binary == "planner" {
+			s.PlanOutcome = "needs_info"
+			s.PlanContent = "NEEDS_INFO: what database?"
+			s.Phase = "plan-done"
+		}
+		SaveState(sp, s)
+		return nil
+	}
+
+	cfg := &config.Config{MaxReplans: 2, MaxCostBudget: 100000}
+	orch := makeOrch(cfg, store, runner, "")
+	orch.GH = gh
+
+	err := orch.replanLoop(context.Background(), key, statePath, 1)
+	if err == nil {
+		t.Fatal("expected error when replanner returns needs_info")
+	}
+
+	hasLabel := false
+	for _, l := range gh.labels {
+		if l == "fabriquilla:needs-human" {
+			hasLabel = true
+		}
+	}
+	if !hasLabel {
+		t.Error("expected fabriquilla:needs-human label")
+	}
+}
+
+func TestReplanLoop_ClearsStaleState(t *testing.T) {
+	dir := t.TempDir()
+	state := &State{
+		IssueNumber:      1,
+		IssueTitle:       "test",
+		IssueBody:        "test",
+		Phase:            "code-done",
+		CoderOutcome:     "plan_infeasible",
+		InfeasibleReason: "bad refs",
+		PlanOutcome:      "plan",
+		PlanContent:      "original plan",
+		Design:           "stale design",
+		Code:             "stale code",
+		Review:           &ReviewState{},
+		ArbiterResult:    &ArbiterState{},
+		Files:            []FileState{{Path: "stale.go", Content: "stale"}},
+	}
+	statePath := writeTestState(t, dir, state)
+
+	store := NewFileStateStore(dir)
+	key := "state"
+
+	gh := &mockGHForReplan{}
+
+	plannerSawClean := false
+	runner := func(ctx context.Context, cfg *config.Config, binary, sp string, issueNumber int, sandboxImage string) error {
+		s, _ := LoadState(sp)
+		switch binary {
+		case "planner":
+			if s.Design == "" && s.Code == "" && s.Review == nil && s.ArbiterResult == nil && len(s.Files) == 0 && s.CoderOutcome == "" && s.InfeasibleReason == "" {
+				plannerSawClean = true
+			}
+			s.PlanOutcome = "plan"
+			s.PlanContent = "revised plan"
+			s.Phase = "plan-done"
+		case "designer":
+			s.Design = "revised design"
+			s.Phase = "design-done"
+		case "coder":
+			s.CoderOutcome = "success"
+			s.Code = `{"files":[]}`
+			s.Phase = "code-done"
+		}
+		SaveState(sp, s)
+		return nil
+	}
+
+	cfg := &config.Config{MaxReplans: 1, MaxCostBudget: 100000}
+	orch := makeOrch(cfg, store, runner, "")
+	orch.GH = gh
+
+	err := orch.replanLoop(context.Background(), key, statePath, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !plannerSawClean {
+		t.Error("planner should see cleaned state (no stale Design, Code, Review, Files, CoderOutcome, InfeasibleReason)")
+	}
+}
+
+type mockGHForReplan struct {
+	labels   []string
+	comments []string
+}
+
+func (m *mockGHForReplan) Owner() string { return "test" }
+func (m *mockGHForReplan) Repo() string  { return "test" }
+func (m *mockGHForReplan) AddLabel(_ context.Context, _ int, label string) error {
+	m.labels = append(m.labels, label)
+	return nil
+}
+func (m *mockGHForReplan) RemoveLabel(_ context.Context, _ int, _ string) error { return nil }
+func (m *mockGHForReplan) CreateComment(_ context.Context, _ int, body string) error {
+	m.comments = append(m.comments, body)
+	return nil
+}
+func (m *mockGHForReplan) ListComments(_ context.Context, _ int) ([]github.Comment, error) {
+	return nil, nil
+}
+func (m *mockGHForReplan) ListIssuesByLabel(_ context.Context, _ string) ([]github.Issue, error) {
+	return nil, nil
+}
+func (m *mockGHForReplan) CreateIssue(_ context.Context, _, _ string, _ []string) (github.Issue, error) {
+	return github.Issue{}, nil
+}
+func (m *mockGHForReplan) FileExists(_ context.Context, _ string) (bool, error) { return false, nil }
+func (m *mockGHForReplan) GetFileContent(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+func (m *mockGHForReplan) CheckReadiness(_ context.Context) (github.ReadinessResult, error) {
+	return github.ReadinessResult{Ready: true}, nil
+}
+func (m *mockGHForReplan) CloneShallow(_ context.Context) (string, func(), error) {
+	return "", func() {}, nil
+}
+func (m *mockGHForReplan) GetBranchSHA(_ context.Context, _ string) (string, error) {
+	return "abc", nil
+}
+func (m *mockGHForReplan) CreateBranch(_ context.Context, _, _ string) error { return nil }
+func (m *mockGHForReplan) CreateCommit(_ context.Context, _, _ string, _ []github.FileChange) (string, error) {
+	return "sha", nil
+}
+func (m *mockGHForReplan) CreatePullRequest(_ context.Context, _, _, _, _ string) (github.PullRequest, error) {
+	return github.PullRequest{}, nil
+}
+func (m *mockGHForReplan) ListPRReviewComments(_ context.Context, _ int) ([]github.Comment, error) {
+	return nil, nil
+}
+func (m *mockGHForReplan) ListPRReviews(_ context.Context, _ int) ([]github.PRReview, error) {
+	return nil, nil
+}
+func (m *mockGHForReplan) ClosePullRequest(_ context.Context, _ int) error { return nil }
+func (m *mockGHForReplan) DeleteBranch(_ context.Context, _ string) error  { return nil }
+func (m *mockGHForReplan) CloseIssue(_ context.Context, _ int) error       { return nil }
