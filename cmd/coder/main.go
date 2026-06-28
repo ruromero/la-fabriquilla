@@ -17,13 +17,20 @@ import (
 
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
-	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.ModelFor("coder"))
 	if err != nil {
-		slog.Error("resolve default model", "error", err)
+		slog.Error("resolve coder model", "error", err)
+		os.Exit(1)
+	}
+
+	reviewModel, reviewBaseURL, reviewAPIKey, err := cfg.ResolveModel(cfg.ModelFor("reviewer"))
+	if err != nil {
+		slog.Error("resolve reviewer model", "error", err)
 		os.Exit(1)
 	}
 
 	cl := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
+	reviewCl := inference.NewClient(reviewBaseURL, inference.WithAPIKey(reviewAPIKey))
 	ctx := context.Background()
 
 	var sess *harness.SerenaSession
@@ -85,7 +92,7 @@ func main() {
 	code := codeResult.Content
 
 	start = time.Now()
-	review, err := agents.Review(ctx, cl, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
+	review, err := agents.Review(ctx, reviewCl, reviewModel, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
 	elapsed = time.Since(start)
 	if err != nil {
 		slog.Error("review phase failed", "error", err)
@@ -136,7 +143,7 @@ func main() {
 		})
 
 		start = time.Now()
-		review, err = agents.Review(ctx, cl, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
+		review, err = agents.Review(ctx, reviewCl, reviewModel, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
 		elapsed = time.Since(start)
 		if err != nil {
 			slog.Error("review phase failed", "iteration", i+1, "error", err)

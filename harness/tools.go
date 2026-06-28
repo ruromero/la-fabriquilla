@@ -20,6 +20,9 @@ func NewContextToolHandler(rc *RepoContext, gh *github.Client) *ContextToolHandl
 }
 
 func (h *ContextToolHandler) Execute(ctx context.Context, name string, args map[string]any) (string, error) {
+	if h.rc == nil || h.gh == nil {
+		return "", fmt.Errorf("context tools unavailable: missing dependencies")
+	}
 	switch name {
 	case "list_documents":
 		return strings.Join(h.rc.ListDocuments(), "\n"), nil

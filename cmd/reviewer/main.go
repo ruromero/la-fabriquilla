@@ -19,7 +19,7 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	_, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.ModelFor("reviewer"))
 	if err != nil {
 		slog.Error("resolve default model", "error", err)
 		os.Exit(1)
@@ -49,7 +49,7 @@ func main() {
 	tools, handler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
-	rev, err := agents.Review(ctx, cl, state.Code, state.Design, state.PlanContent, state.Conventions, tools, handler)
+	rev, err := agents.Review(ctx, cl, model, state.Code, state.Design, state.PlanContent, state.Conventions, tools, handler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("review phase failed", "error", err)

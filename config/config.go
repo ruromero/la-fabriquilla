@@ -10,8 +10,12 @@ import (
 
 type Config struct {
 	DefaultModel     string                    `json:"default_model,omitempty"`
+	Gatherer         RoleConfig                `json:"gatherer,omitempty"`
 	Planner          RoleConfig                `json:"planner"`
 	Researcher       RoleConfig                `json:"researcher,omitempty"`
+	Designer         RoleConfig                `json:"designer,omitempty"`
+	Coder            RoleConfig                `json:"coder,omitempty"`
+	Reviewer         RoleConfig                `json:"reviewer,omitempty"`
 	PollInterval     Duration                  `json:"poll_interval"`
 	MaxIterations    int                       `json:"max_iterations"`
 	MaxCostBudget    int                       `json:"max_cost_budget"`
@@ -89,6 +93,41 @@ func (c *Config) PhaseDuration(phase string) time.Duration {
 		return c.MaxPhaseDuration.Duration
 	}
 	return 15 * time.Minute
+}
+
+// ModelFor returns the model spec for a given phase, falling back to DefaultModel.
+func (c *Config) ModelFor(phase string) string {
+	switch phase {
+	case "gatherer":
+		if c.Gatherer.Model != "" {
+			return c.Gatherer.Model
+		}
+	case "planner":
+		if c.Planner.Model != "" {
+			return c.Planner.Model
+		}
+	case "researcher":
+		if c.Researcher.Model != "" {
+			return c.Researcher.Model
+		}
+	case "designer":
+		if c.Designer.Model != "" {
+			return c.Designer.Model
+		}
+	case "coder":
+		if c.Coder.Model != "" {
+			return c.Coder.Model
+		}
+	case "reviewer":
+		if c.Reviewer.Model != "" {
+			return c.Reviewer.Model
+		}
+	case "arbiter":
+		if c.Arbiter.Model != "" {
+			return c.Arbiter.Model
+		}
+	}
+	return c.DefaultModel
 }
 
 // ResolveModel parses a "name@endpoint" spec and resolves the endpoint.
@@ -348,8 +387,12 @@ func LoadConfig(path string) (Config, error) {
 
 	for label, spec := range map[string]string{
 		"default_model":    cfg.DefaultModel,
+		"gatherer.model":   cfg.Gatherer.Model,
 		"planner.model":    cfg.Planner.Model,
 		"researcher.model": cfg.Researcher.Model,
+		"designer.model":   cfg.Designer.Model,
+		"coder.model":      cfg.Coder.Model,
+		"reviewer.model":   cfg.Reviewer.Model,
 		"arbiter.model":    cfg.Arbiter.Model,
 	} {
 		if spec != "" {
