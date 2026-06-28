@@ -6,7 +6,9 @@ metadata:
 data:
   config.json: |
     {
-      "default_model": "qwen3:14b@ollama",
+      "default_model": "gemma4-12b-tuned:latest@ollama",
+      "designer": {"model": "gemma4-12b-tuned:latest@ollama"},
+      "coder": {"model": "qwen2.5-coder-14b-tuned:latest@ollama"},
       "planner": {"model": "gemini-2.5-flash@gemini"},
       "researcher": {"model": "gemini-2.5-flash@gemini"},
       "arbiter": {"model": "deepseek-chat@deepseek"},
@@ -17,18 +19,18 @@ data:
       },
       "apps": {
         "dispatcher": {
-          "app_id": 0,
-          "installation_id": 0,
+          "app_id": 4167681,
+          "installation_id": 143144295,
           "private_key_path": "/etc/fabriquilla/keys/dispatcher.pem"
         },
         "worker": {
-          "app_id": 0,
-          "installation_id": 0,
+          "app_id": 4167688,
+          "installation_id": 143144364,
           "private_key_path": "/etc/fabriquilla/keys/worker.pem"
         },
         "committer": {
-          "app_id": 0,
-          "installation_id": 0,
+          "app_id": 4167695,
+          "installation_id": 143144113,
           "private_key_path": "/etc/fabriquilla/keys/committer.pem"
         }
       },
