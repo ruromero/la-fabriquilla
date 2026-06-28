@@ -17,7 +17,7 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	_, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
 	if err != nil {
 		slog.Error("resolve default model", "error", err)
 		os.Exit(1)
@@ -49,7 +49,7 @@ func main() {
 	tools, handler := harness.BuildGatherTools(rc, gh, serenaClient)
 
 	start := time.Now()
-	result, err := agents.GatherContextWithUsage(ctx, cl, state.IssueTitle, state.IssueBody, state.Summaries, tools, handler)
+	result, err := agents.GatherContextWithUsage(ctx, cl, model, state.IssueTitle, state.IssueBody, state.Summaries, tools, handler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("gather context failed", "error", err)

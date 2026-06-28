@@ -8,8 +8,6 @@ import (
 	"github.com/ruromero/la-fabriquilla/review"
 )
 
-const reviewerModel = "qwen3:14b"
-
 const correctnessPrompt = `You are a senior engineer performing an adversarial code review. Your job is to find problems, not approve code.
 
 Evaluate the code against the design and plan. For each issue found, output:
@@ -67,7 +65,7 @@ type ReviewResult struct {
 	Model        string
 }
 
-func Review(ctx context.Context, cl *inference.Client, code, design, plan, conventions string, tools []inference.Tool, handler inference.ToolHandler) (ReviewResult, error) {
+func Review(ctx context.Context, cl *inference.Client, model, code, design, plan, conventions string, tools []inference.Tool, handler inference.ToolHandler) (ReviewResult, error) {
 	codeContext := fmt.Sprintf("## Plan\n\n%s\n\n## Design\n\n%s\n\n## Code\n\n%s", plan, design, code)
 	if conventions != "" {
 		codeContext += fmt.Sprintf("\n\n## Project Conventions\n\nVerify code follows these conventions:\n\n%s", conventions)
@@ -76,7 +74,7 @@ func Review(ctx context.Context, cl *inference.Client, code, design, plan, conve
 	var totalPrompt, totalComp, totalTools int
 	var prompt, comp, tc int
 
-	correctness, prompt, comp, tc, err := reviewWith(ctx, cl, correctnessPrompt, codeContext, tools, handler)
+	correctness, prompt, comp, tc, err := reviewWith(ctx, cl, model, correctnessPrompt, codeContext, tools, handler)
 	if err != nil {
 		return ReviewResult{}, fmt.Errorf("correctness review: %w", err)
 	}
@@ -85,7 +83,7 @@ func Review(ctx context.Context, cl *inference.Client, code, design, plan, conve
 	totalTools += tc
 
 	var security, intent string
-	security, prompt, comp, tc, err = reviewWith(ctx, cl, securityPrompt, codeContext, tools, handler)
+	security, prompt, comp, tc, err = reviewWith(ctx, cl, model, securityPrompt, codeContext, tools, handler)
 	if err != nil {
 		return ReviewResult{}, fmt.Errorf("security review: %w", err)
 	}
@@ -93,7 +91,7 @@ func Review(ctx context.Context, cl *inference.Client, code, design, plan, conve
 	totalComp += comp
 	totalTools += tc
 
-	intent, prompt, comp, tc, err = reviewWith(ctx, cl, intentPrompt, codeContext, nil, nil)
+	intent, prompt, comp, tc, err = reviewWith(ctx, cl, model, intentPrompt, codeContext, nil, nil)
 	if err != nil {
 		return ReviewResult{}, fmt.Errorf("intent review: %w", err)
 	}
@@ -111,14 +109,14 @@ func Review(ctx context.Context, cl *inference.Client, code, design, plan, conve
 		PromptTokens: totalPrompt,
 		CompTokens:   totalComp,
 		ToolCalls:    totalTools,
-		Model:        reviewerModel,
+		Model:        model,
 	}, nil
 }
 
-func reviewWith(ctx context.Context, cl *inference.Client, systemPrompt, userContent string, tools []inference.Tool, handler inference.ToolHandler) (string, int, int, int, error) {
+func reviewWith(ctx context.Context, cl *inference.Client, model, systemPrompt, userContent string, tools []inference.Tool, handler inference.ToolHandler) (string, int, int, int, error) {
 	temp := float64(0)
 	req := inference.ChatRequest{
-		Model: reviewerModel,
+		Model: model,
 		Messages: []inference.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userContent},

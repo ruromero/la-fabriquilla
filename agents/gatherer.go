@@ -7,8 +7,6 @@ import (
 	"github.com/ruromero/la-fabriquilla/inference"
 )
 
-const gathererModel = "qwen3:14b"
-
 const gathererSystemPrompt = `You are a context gathering agent for a software development planner.
 
 Given a GitHub issue, you must gather enough project context to produce an accurate implementation plan. You have access to project documentation, source files, and code navigation tools.
@@ -60,18 +58,18 @@ type GatherResult struct {
 	Model        string
 }
 
-func GatherContext(ctx context.Context, cl *inference.Client, issueTitle, issueBody, summaries string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
-	r, err := GatherContextWithUsage(ctx, cl, issueTitle, issueBody, summaries, tools, handler)
+func GatherContext(ctx context.Context, cl *inference.Client, model, issueTitle, issueBody, summaries string, tools []inference.Tool, handler inference.ToolHandler) (string, error) {
+	r, err := GatherContextWithUsage(ctx, cl, model, issueTitle, issueBody, summaries, tools, handler)
 	return r.Content, err
 }
 
 // GatherContextWithUsage works like GatherContext but also returns token usage.
-func GatherContextWithUsage(ctx context.Context, cl *inference.Client, issueTitle, issueBody, summaries string, tools []inference.Tool, handler inference.ToolHandler) (GatherResult, error) {
+func GatherContextWithUsage(ctx context.Context, cl *inference.Client, model, issueTitle, issueBody, summaries string, tools []inference.Tool, handler inference.ToolHandler) (GatherResult, error) {
 	userPrompt := fmt.Sprintf("## Issue: %s\n\n%s\n\n## Project Summaries\n\n%s", issueTitle, issueBody, summaries)
 
 	temp := float64(0)
 	resp, err := cl.ChatWithTools(ctx, inference.ChatRequest{
-		Model: gathererModel,
+		Model: model,
 		Messages: []inference.Message{
 			{Role: "system", Content: gathererSystemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -88,6 +86,6 @@ func GatherContextWithUsage(ctx context.Context, cl *inference.Client, issueTitl
 		PromptTokens: resp.Usage.PromptTokens,
 		CompTokens:   resp.Usage.CompletionTokens,
 		ToolCalls:    resp.Usage.ToolCallCount,
-		Model:        gathererModel,
+		Model:        model,
 	}, nil
 }

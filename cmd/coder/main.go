@@ -85,7 +85,7 @@ func main() {
 	code := codeResult.Content
 
 	start = time.Now()
-	review, err := agents.Review(ctx, cl, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
+	review, err := agents.Review(ctx, cl, model, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
 	elapsed = time.Since(start)
 	if err != nil {
 		slog.Error("review phase failed", "error", err)
@@ -136,7 +136,7 @@ func main() {
 		})
 
 		start = time.Now()
-		review, err = agents.Review(ctx, cl, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
+		review, err = agents.Review(ctx, cl, model, code, state.Design, state.PlanContent, state.Conventions, gatherTools, gatherHandler)
 		elapsed = time.Since(start)
 		if err != nil {
 			slog.Error("review phase failed", "iteration", i+1, "error", err)
