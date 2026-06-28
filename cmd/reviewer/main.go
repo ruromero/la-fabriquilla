@@ -19,7 +19,7 @@ import (
 func main() {
 	cfg, state := helpers.MustLoadConfigAndState()
 
-	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.DefaultModel)
+	model, baseURL, apiKey, err := cfg.ResolveModel(cfg.ModelFor("reviewer"))
 	if err != nil {
 		slog.Error("resolve default model", "error", err)
 		os.Exit(1)
