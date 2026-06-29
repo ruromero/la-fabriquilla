@@ -148,6 +148,15 @@ func (c *Client) AddLabel(ctx context.Context, issueNumber int, label string) er
 	return c.post(ctx, url, body, nil)
 }
 
+func (c *Client) ListLabels(ctx context.Context, issueNumber int) ([]Label, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/labels", c.owner, c.repo, issueNumber)
+	var labels []Label
+	if err := c.get(ctx, url, &labels); err != nil {
+		return nil, fmt.Errorf("list labels: %w", err)
+	}
+	return labels, nil
+}
+
 func (c *Client) RemoveLabel(ctx context.Context, issueNumber int, label string) error {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/labels/%s", c.owner, c.repo, issueNumber, label)
 	return c.delete(ctx, url)
