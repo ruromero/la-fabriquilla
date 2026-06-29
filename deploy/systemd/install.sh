@@ -90,6 +90,10 @@ if [[ ! -f "${CONFIG_DIR}/env" ]]; then
   echo "==> Created ${CONFIG_DIR}/env from template — edit it with real API keys"
 fi
 
+echo "==> Setting ownership and permissions"
+chown -R root:fabriquilla "${CONFIG_DIR}"
+chmod 750 "${CONFIG_DIR}" "${CONFIG_DIR}/keys" "${POLICY_DIR}"
+chmod 640 "${CONFIG_DIR}/env" "${POLICY_DIR}"/*.yaml
 chown -R fabriquilla:fabriquilla "${STATE_DIR}"
 
 echo ""
@@ -98,8 +102,7 @@ echo ""
 echo "  1. Copy your config:  cp config.json ${CONFIG_DIR}/config.json"
 echo "  2. Copy PEM keys:     cp *.pem ${CONFIG_DIR}/keys/"
 echo "  3. Edit API keys:     vi ${CONFIG_DIR}/env"
-echo "  4. Fix permissions:   chown root:fabriquilla ${CONFIG_DIR}/keys/*.pem"
-echo "                        chmod 640 ${CONFIG_DIR}/keys/*.pem ${CONFIG_DIR}/env"
+echo "  4. Fix permissions:   chmod 640 ${CONFIG_DIR}/config.json ${CONFIG_DIR}/keys/*.pem"
 echo ""
 echo "  Then: systemctl enable --now fabriquilla"
 echo "  Logs: journalctl -u fabriquilla -f"
