@@ -1,7 +1,7 @@
 network:
   default: deny
   allow:
-    - endpoint: "ollama.ai.svc.cluster.local:11434"
+    - endpoint: "localhost:11434"
       methods: [POST]
       paths: ["/v1/chat/completions"]
     - endpoint: "api.github.com:443"

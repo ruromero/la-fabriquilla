@@ -1,0 +1,27 @@
+[Unit]
+Description=Fabriquilla autonomous software development orchestrator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fabriquilla
+Group=fabriquilla
+
+ExecStart=/usr/local/bin/dispatcher --config /etc/fabriquilla/config.json
+
+EnvironmentFile=/etc/fabriquilla/env
+WorkingDirectory=/var/lib/fabriquilla
+
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/fabriquilla
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

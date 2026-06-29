@@ -55,7 +55,10 @@ sandbox-typescript: sandbox-base
 
 sandbox-images: sandbox-go sandbox-rust sandbox-typescript
 
-.PHONY: image image-push deploy
+.PHONY: deploy-host image image-push deploy
+
+deploy-host:
+	sudo deploy/systemd/install.sh
 
 image:
 	$(CONTAINER_ENGINE) build -t $(REGISTRY)/fabriquilla:latest .
