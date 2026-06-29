@@ -4,40 +4,64 @@ Autonomous software development orchestrator. Polls GitHub issues tagged `fabriq
 
 ## Pipeline
 
-1. **Research** — configurable model (e.g. Gemini) for external context gathering
-2. **Plan** — configurable model via any OpenAI-compatible API (Gemini, DeepSeek, etc.) decomposes the issue into an implementation plan
-3. **Design** — qwen3:14b produces API contracts, data models, file structure *(not yet wired)*
-4. **Code** — qwen3:14b + Serena MCP (LSP tools) writes the implementation *(not yet wired)*
-5. **Review** — qwen3:14b (correctness + security + intent) + Qodo (GitHub AI reviewer) *(not yet wired)*
-6. **Iterate** — qwen3:14b applies review feedback (max N loops) *(not yet wired)*
+1. **Gather** — collects repo context (file structure, docs, conventions) using read-only tools
+2. **Research** — configurable model (e.g. Gemini) for external context gathering
+3. **Plan** — configurable model via any OpenAI-compatible API decomposes the issue into an implementation plan
+4. **Design** — produces API contracts, data models, file structure using read-only code navigation
+5. **Code** — generates implementation files
+6. **Review** — correctness + security + intent alignment review (must use a different model family than code generation)
+7. **Iterate** — applies review feedback (max N loops)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed data flow and package layout.
 
 ## Requirements
 
-- k3s cluster with [Ollama](https://ollama.com) deployed (GPU access)
-- Models pulled: `qwen3:14b`
-- GitHub App installed on target repos (recommended), or a GitHub PAT
-- API keys for any remote endpoints (Gemini, DeepSeek, etc.)
+- Linux host (amd64)
+- [Ollama](https://ollama.com) with models pulled (e.g. `gemma4-12b`, `qwen2.5-coder-14b`)
+- GitHub App(s) installed on target repos (see [Authentication](#authentication))
+- API keys for remote endpoints (Gemini, DeepSeek, etc.)
+- Optional: [OpenShell](https://github.com/nicholasgasior/openshell) for sandboxed phase execution
 
-## Quick start
+## Installation
+
+Install as a systemd service from GitHub Releases:
 
 ```bash
-# Build all binaries
+curl -sSL https://raw.githubusercontent.com/ruromero/la-fabriquilla/main/deploy/systemd/install.sh | sudo bash
+```
+
+Pin a specific version:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/ruromero/la-fabriquilla/main/deploy/systemd/install.sh | sudo bash -s -- --version v0.1.0
+```
+
+The installer downloads pre-built binaries, creates a `fabriquilla` service user, installs the systemd unit, and sets up sandbox policies. After installing:
+
+```bash
+# 1. Copy your config
+sudo cp config.json /etc/fabriquilla/config.json
+
+# 2. Copy GitHub App PEM keys
+sudo cp *.pem /etc/fabriquilla/keys/
+sudo chown root:fabriquilla /etc/fabriquilla/keys/*.pem
+sudo chmod 640 /etc/fabriquilla/keys/*.pem
+
+# 3. Edit API keys
+sudo vi /etc/fabriquilla/env
+
+# 4. Start the service
+sudo systemctl enable --now fabriquilla
+
+# 5. Watch logs
+journalctl -u fabriquilla -f
+```
+
+### Build from source
+
+```bash
 make build
-
-# Configure
-cp config.example.json config.json
-# Edit config.json with your app credentials
-
-# Credentials via env vars (never in config)
-export GITHUB_APP_PRIVATE_KEY_PATH=/etc/fabriquilla/github-app.pem
-# API keys referenced by api_key_env in endpoint configs
-export GEMINI_API_KEY=your-key
-export DEEPSEEK_API_KEY=your-key
-
-# Run the dispatcher (invokes phase binaries as subprocesses)
-./bin/dispatcher -config config.json
+./bin/dispatcher --config config.json
 ```
 
 ## Smoke Test
@@ -104,18 +128,19 @@ The orchestrator supports multiple repos in a single instance. All inference end
 
 ```json
 {
-  "default_model": "qwen2.5-coder:14b@ollama",
+  "default_model": "gemma4-12b:latest@ollama",
+  "coder": {"model": "qwen2.5-coder-14b:latest@ollama"},
   "planner": {"model": "gemini-2.5-flash@gemini"},
   "researcher": {"model": "gemini-2.5-flash@gemini"},
   "arbiter": {"model": "deepseek-chat@deepseek"},
   "endpoints": {
-    "ollama": {"base_url": "http://ollama.ai.svc.cluster.local:11434/v1"},
+    "ollama": {"base_url": "http://localhost:11434/v1"},
     "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key_env": "GEMINI_API_KEY"},
     "deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "DEEPSEEK_API_KEY"}
   },
   "poll_interval": "30s",
   "max_iterations": 3,
-  "shadow_mode": true,
+  "shadow_mode": false,
   "apps": {
     "dispatcher": {"app_id": 111111, "installation_id": 222222},
     "worker": {"app_id": 333333, "installation_id": 444444},
@@ -162,15 +187,21 @@ Context documents are loaded from the `include_docs` list in the repo config. De
 
 ## Deployment
 
-Credentials are injected via environment or mounted files — never baked into images:
+### Systemd (recommended)
 
-```yaml
-# Secret with the PEM and API keys
-kubectl create secret generic fabriquilla-creds \
-  --from-file=github-app.pem=/path/to/key.pem \
-  --from-literal=GEMINI_API_KEY=your-key \
-  --from-literal=DEEPSEEK_API_KEY=your-key
+See [Installation](#installation) above. The dispatcher runs as a systemd service, executing phase binaries as subprocesses. When [OpenShell](https://github.com/nicholasgasior/openshell) is installed and `sandbox.enabled` is set in config, phases run inside isolated containers with per-phase network policies.
+
+### Container (k8s / Docker)
+
+A container image is published on every release:
+
+```bash
+docker pull ghcr.io/ruromero/fabriquilla:latest
 ```
+
+Credentials are injected via environment or mounted files — never baked into images. See `deploy/k8s/` for example manifests.
+
+Note: OpenShell sandboxing is not available inside containers without mounting the host container runtime socket.
 
 Sandbox images are built from `deploy/sandbox-images/` (base + language-specific).
 See ARCHITECTURE.md §5 for the image layout.
