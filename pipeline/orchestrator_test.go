@@ -68,7 +68,7 @@ func TestReviewIterateLoop_CleanReview(t *testing.T) {
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
 	orch := makeOrch(cfg, store, runner, "")
-	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
+	err := orch.reviewWithExternalLoop(context.Background(), key, statePath, 1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestReviewIterateLoop_MaxIterations(t *testing.T) {
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
 	orch := makeOrch(cfg, store, runner, "")
-	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
+	err := orch.reviewWithExternalLoop(context.Background(), key, statePath, 1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestReviewIterateLoop_ConvergesMidLoop(t *testing.T) {
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
 	orch := makeOrch(cfg, store, runner, "")
-	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
+	err := orch.reviewWithExternalLoop(context.Background(), key, statePath, 1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestReviewIterateLoop_ArbiterDismissesAll(t *testing.T) {
 		},
 	}
 	orch := makeOrch(cfg, store, runner, "")
-	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
+	err := orch.reviewWithExternalLoop(context.Background(), key, statePath, 1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestReviewIterateLoop_StaleArbiterIgnoredWhenDisabled(t *testing.T) {
 
 	cfg := &config.Config{MaxIterations: 3, MaxCostBudget: 100000}
 	orch := makeOrch(cfg, store, runner, "")
-	err := orch.reviewIterateLoop(context.Background(), key, statePath, 1)
+	err := orch.reviewWithExternalLoop(context.Background(), key, statePath, 1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -576,4 +576,7 @@ func (m *mockGHForReplan) ListPRReviews(_ context.Context, _ int) ([]github.PRRe
 }
 func (m *mockGHForReplan) ClosePullRequest(_ context.Context, _ int) error { return nil }
 func (m *mockGHForReplan) DeleteBranch(_ context.Context, _ string) error  { return nil }
-func (m *mockGHForReplan) CloseIssue(_ context.Context, _ int) error       { return nil }
+func (m *mockGHForReplan) ListLabels(_ context.Context, _ int) ([]github.Label, error) {
+	return nil, nil
+}
+func (m *mockGHForReplan) CloseIssue(_ context.Context, _ int) error { return nil }

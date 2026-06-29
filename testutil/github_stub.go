@@ -113,6 +113,16 @@ func (mc *MemoryClient) RemoveLabel(_ context.Context, issueNumber int, label st
 	return nil
 }
 
+func (mc *MemoryClient) ListLabels(_ context.Context, issueNumber int) ([]github.Label, error) {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+	issue, ok := mc.issues[issueNumber]
+	if !ok {
+		return nil, nil
+	}
+	return issue.Labels, nil
+}
+
 func (mc *MemoryClient) CreateComment(_ context.Context, issueNumber int, body string) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()

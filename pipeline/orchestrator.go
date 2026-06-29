@@ -10,11 +10,17 @@ import (
 	"github.com/ruromero/la-fabriquilla/config"
 	"github.com/ruromero/la-fabriquilla/github"
 	"github.com/ruromero/la-fabriquilla/harness"
+	"github.com/ruromero/la-fabriquilla/review"
 	"github.com/ruromero/la-fabriquilla/sandbox"
 )
 
 // PhaseRunner is a function that executes a single pipeline phase binary.
 type PhaseRunner func(ctx context.Context, cfg *config.Config, binary, statePath string, issueNumber int, sandboxImage string) error
+
+// ArbiterFunc classifies review findings. The orchestrator calls this when
+// merging external review findings with the internal review. It mirrors
+// agents.Arbitrate but is injected to avoid a pipeline→agents import cycle.
+type ArbiterFunc func(ctx context.Context, findings []review.ReviewFinding, conventions, architecture, plan string, dismissedKeys []string) (review.ArbiterResult, error)
 
 // Orchestrator holds all dependencies needed to process a single issue
 // through the full pipeline. It is constructed by the dispatcher (or smoke
@@ -24,6 +30,7 @@ type Orchestrator struct {
 	Config       *config.Config
 	Store        *FileStateStore
 	RunPhase     PhaseRunner
+	RunArbiter   ArbiterFunc
 	SandboxImage string
 	ConfigPath   string
 	IncludeDocs  []string
@@ -245,7 +252,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 
 		if state.PRNumber > 0 {
 			log.Info("PR created, starting review loop", "pr", state.PRNumber)
-			if err := o.reviewIterateLoop(ctx, key, statePath, issue.Number); err != nil {
+			if err := o.reviewWithExternalLoop(ctx, key, statePath, issue.Number, state.PRNumber); err != nil {
 				log.Warn("review-iterate loop failed", "error", err)
 				comment := fmt.Sprintf("## Factory: Review Loop Failed\n\nThe automated review-iterate loop failed after creating PR #%d.\n\n```\n%s\n```\n\nPlease review the PR manually.", state.PRNumber, err)
 				o.GH.CreateComment(ctx, issue.Number, comment)
@@ -267,8 +274,15 @@ func (o *Orchestrator) bestState(ctx context.Context, key string, fallback *Stat
 	return fallback
 }
 
-// reviewIterateLoop runs the reviewer/iterator loop up to Config.MaxIterations times.
-func (o *Orchestrator) reviewIterateLoop(ctx context.Context, key, statePath string, issueNumber int) error {
+// reviewWithExternalLoop runs internal review, optionally merges external
+// (Qodo) findings, re-runs arbiter on the combined set, and iterates.
+func (o *Orchestrator) reviewWithExternalLoop(ctx context.Context, key, statePath string, issueNumber, prNumber int) error {
+	var externalLabel string
+	if o.GH != nil {
+		repoCfg, _ := o.Config.FindRepoConfig(o.GH.Owner(), o.GH.Repo())
+		externalLabel = repoCfg.ExternalReviewLabel
+	}
+
 	for i := 0; i < o.Config.MaxIterations; i++ {
 		slog.Info("starting review iteration", "iteration", i+1, "max", o.Config.MaxIterations)
 
@@ -282,6 +296,45 @@ func (o *Orchestrator) reviewIterateLoop(ctx context.Context, key, statePath str
 		}
 		if err := CheckCostBudget(state, o.Config.MaxCostBudget); err != nil {
 			return fmt.Errorf("budget exceeded after review (iteration %d): %w", i+1, err)
+		}
+
+		if externalLabel != "" && prNumber > 0 {
+			extFindings := o.waitAndParseExternalReview(ctx, prNumber, externalLabel)
+			if len(extFindings) > 0 {
+				slog.Info("merging external review findings", "count", len(extFindings))
+				if state.Review == nil {
+					state.Review = &ReviewState{}
+				}
+				state.Review.Findings = append(state.Review.Findings, extFindings...)
+
+				if o.Config.Arbiter.Model != "" && o.RunArbiter != nil {
+					var dismissedKeys []string
+					if state.ArbiterResult != nil {
+						dismissedKeys = state.ArbiterResult.DismissedKeys
+					}
+					arbResult, arbErr := o.RunArbiter(ctx, state.Review.Findings,
+						state.Conventions, state.Summaries, state.PlanContent, dismissedKeys)
+					if arbErr != nil {
+						slog.Warn("arbiter on merged findings failed, using severity-based check", "error", arbErr)
+					} else {
+						var newDismissed []string
+						newDismissed = append(newDismissed, dismissedKeys...)
+						for _, f := range arbResult.Findings {
+							if f.Classification == review.ClassDismissed {
+								newDismissed = append(newDismissed, review.DismissKey(f.Finding))
+							}
+						}
+						state.ArbiterResult = &ArbiterState{
+							Findings:      arbResult.Findings,
+							DismissedKeys: newDismissed,
+						}
+					}
+				}
+
+				if err := o.Store.Save(ctx, key, state); err != nil {
+					return fmt.Errorf("save merged review state: %w", err)
+				}
+			}
 		}
 
 		needsIteration := false
@@ -311,6 +364,111 @@ func (o *Orchestrator) reviewIterateLoop(ctx context.Context, key, statePath str
 	}
 
 	slog.Warn("max review iterations reached", "max", o.Config.MaxIterations)
+	return nil
+}
+
+// servicePRClient adapts github.Service to review.PRCommentClient.
+type servicePRClient struct {
+	svc github.Service
+}
+
+func (s *servicePRClient) CreateComment(ctx context.Context, issueNumber int, body string) error {
+	return s.svc.CreateComment(ctx, issueNumber, body)
+}
+
+func (s *servicePRClient) ListPRComments(ctx context.Context, prNumber int) ([]review.PRComment, error) {
+	comments, err := s.svc.ListComments(ctx, prNumber)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]review.PRComment, len(comments))
+	for i, c := range comments {
+		result[i] = review.PRComment{
+			ID:        c.ID,
+			Body:      c.Body,
+			User:      c.User.Login,
+			CreatedAt: c.CreatedAt,
+		}
+	}
+	return result, nil
+}
+
+func (s *servicePRClient) ListPRReviewComments(ctx context.Context, prNumber int) ([]review.PRComment, error) {
+	comments, err := s.svc.ListPRReviewComments(ctx, prNumber)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]review.PRComment, len(comments))
+	for i, c := range comments {
+		result[i] = review.PRComment{
+			ID:        c.ID,
+			Body:      c.Body,
+			User:      c.User.Login,
+			CreatedAt: c.CreatedAt,
+		}
+	}
+	return result, nil
+}
+
+func (s *servicePRClient) ListPRReviews(ctx context.Context, prNumber int) ([]review.PRReview, error) {
+	reviews, err := s.svc.ListPRReviews(ctx, prNumber)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]review.PRReview, len(reviews))
+	for i, r := range reviews {
+		result[i] = review.PRReview{
+			ID:          r.ID,
+			Body:        r.Body,
+			State:       r.State,
+			User:        r.User.Login,
+			SubmittedAt: r.SubmittedAt,
+		}
+	}
+	return result, nil
+}
+
+// waitAndParseExternalReview polls for an external review label on the PR,
+// then parses Qodo findings. Returns empty slice on timeout.
+func (o *Orchestrator) waitAndParseExternalReview(ctx context.Context, prNumber int, label string) []review.ReviewFinding {
+	timeout := o.Config.PhaseDuration("feedback")
+	deadline := time.Now().Add(timeout)
+
+	slog.Info("waiting for external review", "label", label, "timeout", timeout)
+
+	for time.Now().Before(deadline) {
+		labels, err := o.GH.ListLabels(ctx, prNumber)
+		if err != nil {
+			slog.Warn("failed to check PR labels", "error", err)
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		found := false
+		for _, l := range labels {
+			if l.Name == label {
+				found = true
+				break
+			}
+		}
+		if found {
+			slog.Info("external review label found", "label", label)
+			adapter := &review.QodoAdapter{}
+			client := &servicePRClient{svc: o.GH}
+			findings, err := adapter.ParseFindings(ctx, client, prNumber)
+			if err != nil {
+				slog.Warn("failed to parse external findings", "error", err)
+				return nil
+			}
+			for i := range findings {
+				findings[i].Title = sandbox.SanitizeInput(findings[i].Title)
+				findings[i].Detail = sandbox.SanitizeInput(findings[i].Detail)
+			}
+			return findings
+		}
+		time.Sleep(30 * time.Second)
+	}
+
+	slog.Warn("external review timed out, proceeding with internal review only", "timeout", timeout)
 	return nil
 }
 

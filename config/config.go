@@ -169,16 +169,17 @@ var DefaultIncludeDocs = []string{
 }
 
 type RepoConfig struct {
-	Owner            string   `json:"owner"`
-	Repo             string   `json:"repo"`
-	Language         string   `json:"language,omitempty"`
-	SandboxImage     string   `json:"sandbox_image,omitempty"`
-	IncludeDocs      []string `json:"include_docs,omitempty"`
-	ValidateCommands []string `json:"validate_commands,omitempty"`
-	Token            string   `json:"token,omitempty"`
-	AppID            int64    `json:"app_id,omitempty"`
-	PrivateKeyPath   string   `json:"private_key_path,omitempty"`
-	InstallationID   int64    `json:"installation_id,omitempty"`
+	Owner               string   `json:"owner"`
+	Repo                string   `json:"repo"`
+	Language            string   `json:"language,omitempty"`
+	SandboxImage        string   `json:"sandbox_image,omitempty"`
+	IncludeDocs         []string `json:"include_docs,omitempty"`
+	ValidateCommands    []string `json:"validate_commands,omitempty"`
+	ExternalReviewLabel string   `json:"external_review_label,omitempty"`
+	Token               string   `json:"token,omitempty"`
+	AppID               int64    `json:"app_id,omitempty"`
+	PrivateKeyPath      string   `json:"private_key_path,omitempty"`
+	InstallationID      int64    `json:"installation_id,omitempty"`
 }
 
 func (c *Config) FindRepoConfig(owner, repo string) (RepoConfig, bool) {

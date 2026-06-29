@@ -13,11 +13,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ruromero/la-fabriquilla/agents"
 	helpers "github.com/ruromero/la-fabriquilla/cmd/internal"
 	"github.com/ruromero/la-fabriquilla/config"
 	"github.com/ruromero/la-fabriquilla/github"
+	"github.com/ruromero/la-fabriquilla/inference"
 	"github.com/ruromero/la-fabriquilla/openshell"
 	"github.com/ruromero/la-fabriquilla/pipeline"
+	"github.com/ruromero/la-fabriquilla/review"
 )
 
 var configPath string
@@ -198,6 +201,7 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, rep
 		Config:       &cfg,
 		Store:        store,
 		RunPhase:     pipeline.PhaseRunner(runPhase),
+		RunArbiter:   buildArbiterFunc(&cfg),
 		SandboxImage: sandboxImage,
 		ConfigPath:   configPath,
 		IncludeDocs:  repo.EffectiveIncludeDocs(),
@@ -205,6 +209,24 @@ func processIssue(ctx context.Context, gh *github.Client, cfg config.Config, rep
 
 	_, err := orch.ProcessIssue(ctx, issue)
 	return err
+}
+
+func buildArbiterFunc(cfg *config.Config) pipeline.ArbiterFunc {
+	if cfg.Arbiter.Model == "" {
+		return nil
+	}
+	return func(ctx context.Context, findings []review.ReviewFinding, conventions, architecture, plan string, dismissedKeys []string) (review.ArbiterResult, error) {
+		model, baseURL, apiKey, err := cfg.ResolveModel(cfg.Arbiter.Model)
+		if err != nil {
+			return review.ArbiterResult{}, fmt.Errorf("resolve arbiter model: %w", err)
+		}
+		cl := inference.NewClient(baseURL, inference.WithAPIKey(apiKey))
+		out, err := agents.Arbitrate(ctx, cl, model, findings, conventions, architecture, plan, dismissedKeys)
+		if err != nil {
+			return review.ArbiterResult{}, err
+		}
+		return out.Result, nil
+	}
 }
 
 // noRetryPhases lists phases that must not be retried because they

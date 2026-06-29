@@ -10,6 +10,7 @@ type Service interface {
 
 	// Issues
 	ListIssuesByLabel(ctx context.Context, label string) ([]Issue, error)
+	ListLabels(ctx context.Context, issueNumber int) ([]Label, error)
 	AddLabel(ctx context.Context, issueNumber int, label string) error
 	RemoveLabel(ctx context.Context, issueNumber int, label string) error
 	CreateComment(ctx context.Context, issueNumber int, body string) error
