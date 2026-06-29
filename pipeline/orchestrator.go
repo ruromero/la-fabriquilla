@@ -187,6 +187,52 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 			return state, fmt.Errorf("secret detected in generated code: %s in %s line %d", violations[0].Pattern, violations[0].File, violations[0].Line)
 		}
 
+		repoCfg, _ := o.Config.FindRepoConfig(state.RepoOwner, state.RepoName)
+		if len(repoCfg.ValidateCommands) > 0 {
+			maxAttempts := o.Config.MaxIterations
+			if maxAttempts < 1 {
+				maxAttempts = 1
+			}
+			for attempt := 0; attempt < maxAttempts; attempt++ {
+				log.Info("starting validate phase", "attempt", attempt+1)
+				if err := o.RunPhase(ctx, o.Config, "validator", statePath, issue.Number, o.SandboxImage); err != nil {
+					return o.bestState(ctx, key, state), fmt.Errorf("validate phase: %w", err)
+				}
+				state, err = o.Store.Load(ctx, key)
+				if err != nil {
+					return state, fmt.Errorf("reload state after validate: %w", err)
+				}
+				if state.ValidatePass {
+					log.Info("validation passed")
+					break
+				}
+				if attempt == maxAttempts-1 {
+					return state, fmt.Errorf("validation failed after %d attempts", attempt+1)
+				}
+				log.Info("validation failed, retrying coder with feedback")
+				state.ReplanFeedback = fmt.Sprintf("Build/test validation failed. Fix the errors and regenerate all files.\n\n%s", sandbox.SanitizeInput(state.ValidateOutput))
+				if err := o.Store.Save(ctx, key, state); err != nil {
+					return state, fmt.Errorf("save validation feedback: %w", err)
+				}
+				if err := o.RunPhase(ctx, o.Config, "coder", statePath, issue.Number, o.SandboxImage); err != nil {
+					return o.bestState(ctx, key, state), fmt.Errorf("code retry after validation: %w", err)
+				}
+				state, err = o.Store.Load(ctx, key)
+				if err != nil {
+					return state, fmt.Errorf("reload state after code retry: %w", err)
+				}
+				if err := CheckPRScope(state.Files, o.Config.MaxFilesChanged, o.Config.MaxPRSizeLines); err != nil {
+					return state, fmt.Errorf("scope check after retry: %w", err)
+				}
+				if err := ValidateFiles(state.Files, o.Config.BlockedPaths); err != nil {
+					return state, fmt.Errorf("path validation after retry: %w", err)
+				}
+				if violations := ValidateContents(state.Files); len(violations) > 0 {
+					return state, fmt.Errorf("secret detected after retry: %s in %s line %d", violations[0].Pattern, violations[0].File, violations[0].Line)
+				}
+			}
+		}
+
 		log.Info("starting commit phase")
 		if err := o.RunPhase(ctx, o.Config, "committer", statePath, issue.Number, o.SandboxImage); err != nil {
 			return o.bestState(ctx, key, state), fmt.Errorf("commit phase: %w", err)

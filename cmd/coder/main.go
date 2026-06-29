@@ -55,8 +55,13 @@ func main() {
 	rc := harness.LoadRepoContext(ctx, gh, state.IncludeDocs)
 	gatherTools, gatherHandler := harness.BuildGatherTools(rc, gh, serenaClient)
 
+	design := state.Design
+	if state.ReplanFeedback != "" {
+		design += "\n\n## Validation Feedback\n\nThe previous code failed validation. Fix ALL errors below and regenerate ALL files.\n\n" + state.ReplanFeedback
+	}
+
 	start := time.Now()
-	codeResult, err := agents.CodeWithUsage(ctx, cl, model, state.Design, state.ResearchContext, state.Conventions, coderTools, coderHandler)
+	codeResult, err := agents.CodeWithUsage(ctx, cl, model, design, state.ResearchContext, state.Conventions, coderTools, coderHandler)
 	elapsed := time.Since(start)
 	if err != nil {
 		slog.Error("code phase failed", "error", err)

@@ -1,0 +1,6 @@
+network:
+  default: deny
+  allow:
+    - endpoint: "api.github.com:443"
+      methods: [GET]
+      paths: ["/repos/"]
