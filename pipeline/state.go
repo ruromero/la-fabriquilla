@@ -74,6 +74,9 @@ type State struct {
 	TotalCompTokens   int           `json:"total_completion_tokens,omitempty"`
 	TotalCostUSD      float64       `json:"total_cost_usd,omitempty"`
 
+	ValidatePass   bool   `json:"validate_pass,omitempty"`
+	ValidateOutput string `json:"validate_output,omitempty"`
+
 	PRNumber int    `json:"pr_number,omitempty"`
 	PRBranch string `json:"pr_branch,omitempty"`
 

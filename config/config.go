@@ -169,15 +169,25 @@ var DefaultIncludeDocs = []string{
 }
 
 type RepoConfig struct {
-	Owner          string   `json:"owner"`
-	Repo           string   `json:"repo"`
-	Language       string   `json:"language,omitempty"`
-	SandboxImage   string   `json:"sandbox_image,omitempty"`
-	IncludeDocs    []string `json:"include_docs,omitempty"`
-	Token          string   `json:"token,omitempty"`
-	AppID          int64    `json:"app_id,omitempty"`
-	PrivateKeyPath string   `json:"private_key_path,omitempty"`
-	InstallationID int64    `json:"installation_id,omitempty"`
+	Owner            string   `json:"owner"`
+	Repo             string   `json:"repo"`
+	Language         string   `json:"language,omitempty"`
+	SandboxImage     string   `json:"sandbox_image,omitempty"`
+	IncludeDocs      []string `json:"include_docs,omitempty"`
+	ValidateCommands []string `json:"validate_commands,omitempty"`
+	Token            string   `json:"token,omitempty"`
+	AppID            int64    `json:"app_id,omitempty"`
+	PrivateKeyPath   string   `json:"private_key_path,omitempty"`
+	InstallationID   int64    `json:"installation_id,omitempty"`
+}
+
+func (c *Config) FindRepoConfig(owner, repo string) (RepoConfig, bool) {
+	for _, r := range c.Repos {
+		if r.Owner == owner && r.Repo == repo {
+			return r, true
+		}
+	}
+	return RepoConfig{}, false
 }
 
 func (r RepoConfig) EffectiveIncludeDocs() []string {

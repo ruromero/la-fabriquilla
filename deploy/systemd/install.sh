@@ -70,6 +70,7 @@ install -m 755 "${TMPDIR}"/fabriquilla/coder "${INSTALL_DIR}/"
 install -m 755 "${TMPDIR}"/fabriquilla/committer "${INSTALL_DIR}/"
 install -m 755 "${TMPDIR}"/fabriquilla/reviewer "${INSTALL_DIR}/"
 install -m 755 "${TMPDIR}"/fabriquilla/iterator "${INSTALL_DIR}/"
+install -m 755 "${TMPDIR}"/fabriquilla/validator "${INSTALL_DIR}/"
 install -m 755 "${TMPDIR}"/fabriquilla/feedback "${INSTALL_DIR}/"
 
 echo "==> Creating service user"

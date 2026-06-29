@@ -3,7 +3,7 @@ WORKDIR /src
 COPY go.mod ./
 RUN go mod download
 COPY . .
-RUN for bin in dispatcher gatherer researcher planner designer coder committer reviewer iterator; do \
+RUN for bin in dispatcher gatherer researcher planner designer coder committer reviewer iterator validator; do \
       CGO_ENABLED=0 go build -o /out/$bin ./cmd/$bin/; \
     done
 

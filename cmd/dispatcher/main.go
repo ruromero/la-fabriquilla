@@ -217,8 +217,9 @@ var noRetryPhases = map[string]bool{
 // sandboxMVPPhases lists phases enabled for sandbox execution in the MVP.
 // Expand this set as sandbox images and policies are validated per phase.
 var sandboxMVPPhases = map[string]bool{
-	"coder":    true,
-	"iterator": true,
+	"coder":     true,
+	"iterator":  true,
+	"validator": true,
 }
 
 const maxBackoff = 2 * time.Minute
