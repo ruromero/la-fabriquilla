@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    name: Build & Upload Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make build
+
+      - name: Package
+        run: |
+          mkdir -p dist/fabriquilla/policies
+          cp bin/* dist/fabriquilla/
+          cp deploy/systemd/fabriquilla.service dist/fabriquilla/
+          cp deploy/systemd/env.example dist/fabriquilla/
+          cp deploy/sandbox-policies/*.yaml dist/fabriquilla/policies/
+          tar -czf fabriquilla-linux-amd64.tar.gz -C dist fabriquilla
+        shell: bash
+
+      - name: Upload release asset
+        run: gh release upload "${{ github.event.release.tag_name }}" fabriquilla-linux-amd64.tar.gz --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
