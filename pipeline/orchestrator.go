@@ -283,6 +283,8 @@ func (o *Orchestrator) reviewWithExternalLoop(ctx context.Context, key, statePat
 		externalLabel = repoCfg.ExternalReviewLabel
 	}
 
+	externalMerged := false
+
 	for i := 0; i < o.Config.MaxIterations; i++ {
 		slog.Info("starting review iteration", "iteration", i+1, "max", o.Config.MaxIterations)
 
@@ -298,8 +300,9 @@ func (o *Orchestrator) reviewWithExternalLoop(ctx context.Context, key, statePat
 			return fmt.Errorf("budget exceeded after review (iteration %d): %w", i+1, err)
 		}
 
-		if externalLabel != "" && prNumber > 0 {
-			extFindings := o.waitAndParseExternalReview(ctx, prNumber, externalLabel)
+		if externalLabel != "" && prNumber > 0 && !externalMerged {
+			externalMerged = true
+			extFindings := o.waitAndParseExternalReview(ctx, prNumber, externalLabel, state.StartedAt)
 			if len(extFindings) > 0 {
 				slog.Info("merging external review findings", "count", len(extFindings))
 				if state.Review == nil {
@@ -429,8 +432,8 @@ func (s *servicePRClient) ListPRReviews(ctx context.Context, prNumber int) ([]re
 }
 
 // waitAndParseExternalReview polls for an external review label on the PR,
-// then parses Qodo findings. Returns empty slice on timeout.
-func (o *Orchestrator) waitAndParseExternalReview(ctx context.Context, prNumber int, label string) []review.ReviewFinding {
+// then parses Qodo findings posted after cutoff. Returns empty slice on timeout.
+func (o *Orchestrator) waitAndParseExternalReview(ctx context.Context, prNumber int, label string, cutoff time.Time) []review.ReviewFinding {
 	timeout := o.Config.PhaseDuration("feedback")
 	deadline := time.Now().Add(timeout)
 
@@ -452,7 +455,7 @@ func (o *Orchestrator) waitAndParseExternalReview(ctx context.Context, prNumber 
 		}
 		if found {
 			slog.Info("external review label found", "label", label)
-			adapter := &review.QodoAdapter{}
+			adapter := &review.QodoAdapter{TriggeredAt: cutoff}
 			client := &servicePRClient{svc: o.GH}
 			findings, err := adapter.ParseFindings(ctx, client, prNumber)
 			if err != nil {
