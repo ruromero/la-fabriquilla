@@ -210,7 +210,7 @@ func (o *Orchestrator) ProcessIssue(ctx context.Context, issue github.Issue) (*S
 					return state, fmt.Errorf("validation failed after %d attempts", attempt+1)
 				}
 				log.Info("validation failed, retrying coder with feedback")
-				state.ReplanFeedback = fmt.Sprintf("Build/test validation failed. Fix the errors and regenerate all files.\n\n%s", state.ValidateOutput)
+				state.ReplanFeedback = fmt.Sprintf("Build/test validation failed. Fix the errors and regenerate all files.\n\n%s", sandbox.SanitizeInput(state.ValidateOutput))
 				if err := o.Store.Save(ctx, key, state); err != nil {
 					return state, fmt.Errorf("save validation feedback: %w", err)
 				}

@@ -65,8 +65,12 @@ func main() {
 	allPassed := true
 
 	for _, cmdStr := range repoCfg.ValidateCommands {
-		slog.Info("running validate command", "cmd", cmdStr)
 		parts := strings.Fields(cmdStr)
+		if len(parts) == 0 {
+			slog.Warn("skipping empty validate command")
+			continue
+		}
+		slog.Info("running validate command", "binary", parts[0])
 		cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 		cmd.Dir = cloneDir
 
@@ -75,12 +79,12 @@ func main() {
 		cmd.Stderr = &buf
 
 		if err := cmd.Run(); err != nil {
-			slog.Warn("validate command failed", "cmd", cmdStr, "error", err)
+			slog.Warn("validate command failed", "binary", parts[0], "error", err)
 			fmt.Fprintf(&output, "FAIL: %s\n%s\n\n", cmdStr, buf.String())
 			allPassed = false
 			break
 		}
-		slog.Info("validate command passed", "cmd", cmdStr)
+		slog.Info("validate command passed", "binary", parts[0])
 		fmt.Fprintf(&output, "PASS: %s\n", cmdStr)
 	}
 
